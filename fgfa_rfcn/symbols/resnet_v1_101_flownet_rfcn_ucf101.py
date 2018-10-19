@@ -17,7 +17,7 @@ from operator_py.tile_as import *
 
 
 
-class resnet_v1_101_flownet_rfcn(Symbol):
+class resnet_v1_101_flownet_rfcn_ucf101(Symbol):
     def __init__(self):
         """
         Use __init__ to define parameter network needs
@@ -892,7 +892,6 @@ class resnet_v1_101_flownet_rfcn(Symbol):
         data_bef = mx.sym.Variable(name="data_bef")
         data_aft = mx.sym.Variable(name="data_aft")
         im_info = mx.sym.Variable(name="im_info")
-
         #heat_map
         cam_resnet = self.resnet101_cam(data, num_classes)
         #features
