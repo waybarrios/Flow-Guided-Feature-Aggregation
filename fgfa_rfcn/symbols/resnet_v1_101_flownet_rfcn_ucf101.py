@@ -28,7 +28,7 @@ class resnet_v1_101_flownet_rfcn_ucf101(Symbol):
         self.units = (3, 4, 23, 3)  # use for 101
         self.filter_list = [256, 512, 1024, 2048]
 
-    def get_resnet_v1(self, data):
+    def get_resnet_v1(self, data,is_cam=False):
         conv1 = mx.symbol.Convolution(name='conv1', data=data, num_filter=64, pad=(3, 3), kernel=(7, 7), stride=(2, 2),
                                       no_bias=True)
         bn_conv1 = mx.symbol.BatchNorm(name='bn_conv1', data=conv1, use_global_stats=self.use_global_stats,
@@ -734,6 +734,9 @@ class resnet_v1_101_flownet_rfcn_ucf101(Symbol):
         scale5c_branch2c = bn5c_branch2c
         res5c = mx.symbol.broadcast_add(name='res5c', *[res5b_relu, scale5c_branch2c])
         res5c_relu = mx.symbol.Activation(name='res5c_relu', data=res5c, act_type='relu')
+        
+        if is_cam:
+            return res5c_relu
 
         feat_conv_3x3 = mx.sym.Convolution(
             data=res5c_relu, kernel=(3, 3), pad=(6, 6), dilate=(6, 6), num_filter=1024, name="feat_conv_3x3")
@@ -878,7 +881,8 @@ class resnet_v1_101_flownet_rfcn_ucf101(Symbol):
 
     def resnet101_cam(self, data, num_classes):
 
-        resnet_features = self.get_resnet_v1(data)
+        resnet_features = self.get_resnet_v1(data,is_cam=True)
+
         return self.CAM(resnet_features, num_classes)
         
 
@@ -895,7 +899,7 @@ class resnet_v1_101_flownet_rfcn_ucf101(Symbol):
         #heat_map
         cam_resnet = self.resnet101_cam(data, num_classes)
         #features
-        conv_feat = self.get_resnet_v1(data)
+        conv_feat = self.get_resnet_v1(data,is_cam=False)
 
 
         return 
