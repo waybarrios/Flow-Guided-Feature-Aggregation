@@ -733,11 +733,9 @@ class resnet_v1_101_flownet_rfcn_ucf101(Symbol):
                                             use_global_stats=self.use_global_stats, eps=self.eps, fix_gamma=False)
         scale5c_branch2c = bn5c_branch2c
         res5c = mx.symbol.broadcast_add(name='res5c', *[res5b_relu, scale5c_branch2c])
-        res5c_relu = mx.symbol.Activation(name='res5c_relu', data=res5c, act_type='relu')
-        
+        res5c_relu = mx.symbol.Activation(name='res5c_relu', data=res5c, act_type='relu') 
         if is_cam:
             return res5c_relu
-
         feat_conv_3x3 = mx.sym.Convolution(
             data=res5c_relu, kernel=(3, 3), pad=(6, 6), dilate=(6, 6), num_filter=1024, name="feat_conv_3x3")
         feat_conv_3x3_relu = mx.sym.Activation(data=feat_conv_3x3, act_type="relu", name="feat_conv_3x3_relu")
@@ -896,13 +894,43 @@ class resnet_v1_101_flownet_rfcn_ucf101(Symbol):
         data_bef = mx.sym.Variable(name="data_bef")
         data_aft = mx.sym.Variable(name="data_aft")
         im_info = mx.sym.Variable(name="im_info")
-        #heat_map
-        cam_resnet = self.resnet101_cam(data, num_classes)
+        
         #features
-        conv_feat = self.get_resnet_v1(data,is_cam=False)
+        feat_bef = self.get_resnet_v1(data_bef,is_cam=False)
+        feat_curr = self.get_resnet_v1(data,is_cam=False)
+        feat_aft = self.get_resnet_v1(data_aft,is_cam=False)
 
+        #CAM
+        heat_bef = self.resnet101_cam(data_bef,num_classes)
+        heat_aft = self.resnet101_cam(data_aft,num_classes)
 
-        return 
+        ### flow
+        
+        concat_flow_data_1 = mx.symbol.Concat(data / 255.0, data_bef / 255.0, dim=1) #before
+        concat_flow_data_2 = mx.symbol.Concat(data / 255.0, data_aft / 255.0, dim=1) #after 
+        flow_bef = self.get_flownet(concat_flow_data_1)
+        flow_aft = self.get_flownet(concat_flow_data_2)
+
+        #flow + heatmap
+        flow_heat_bef = mx.symbol.Concat(flow_bef,heat_bef, dim=0)
+        flow_heat_aft = mx.symbol.Concat(flow_aft,heat_aft, dim=0)
+
+        #conv_1x1
+        fusion_bef =mx.symbol.Convolution(name='fusion_bef', data=flow_heat_bef, num_filter=1024, pad=(0, 0),
+                                            kernel=(1, 1), stride=(1, 1), no_bias=False)
+
+        fusion_aft =mx.symbol.Convolution(name='fusion_aft', data=flow_heat_bef, num_filter=1024, pad=(0, 0),
+                                            kernel=(1, 1), stride=(1, 1), no_bias=False)
+
+        #warping
+
+        flow_heat_grid_bef = mx.sym.GridGenerator(data=fusion_bef, transform_type='warp', name='flow_heat_grid_bef')
+        flow_heat_grid_aft = mx.sym.GridGenerator(data=fusion_aft, transform_type='warp', name='flow_heat_grid_aft')
+
+        warp_conv_feat_bef = mx.sym.BilinearSampler(data=feat_bef, grid=flow_heat_grid_bef, name='warp_conv_feat_bef')
+        warp_conv_feat_aft = mx.sym.BilinearSampler(data=feat_aft, grid=flow_heat_grid_aft, name='warp_conv_feat_aft')
+
+        return warp_conv_feat_bef,feat_curr,warp_conv_feat_aft
 
     def get_train_symbol(self, cfg):
         # config alias for convenient
