@@ -916,10 +916,10 @@ class resnet_v1_101_flownet_rfcn_ucf101(Symbol):
         flow_heat_aft = mx.symbol.Concat(flow_aft,heat_aft, dim=0)
 
         #conv_1x1
-        fusion_bef =mx.symbol.Convolution(name='fusion_bef', data=flow_heat_bef, num_filter=1024, pad=(0, 0),
+        fusion_bef =mx.symbol.Convolution(name='fusion_bef', data=flow_heat_bef, num_filter=1, pad=(0, 0),
                                             kernel=(1, 1), stride=(1, 1), no_bias=False)
 
-        fusion_aft =mx.symbol.Convolution(name='fusion_aft', data=flow_heat_bef, num_filter=1024, pad=(0, 0),
+        fusion_aft =mx.symbol.Convolution(name='fusion_aft', data=flow_heat_bef, num_filter=1, pad=(0, 0),
                                             kernel=(1, 1), stride=(1, 1), no_bias=False)
 
         #warping
