@@ -755,7 +755,7 @@ class resnet_v1_101_flownet_rfcn_ucf101(Symbol):
         cam_fully_connected = mx.sym.FullyConnected(data=cam_pooling, name='cam_fc', num_hidden=num_classes,
                                                     bias=cam_fully_connected_bias, weight=cam_fc_weights)
         
-        return cam_fully_connected
+        return cam_fully_connected, cam_conv_3x3_relu, cam_fc_weights
 
 
     def get_embednet(self, data):
@@ -883,7 +883,14 @@ class resnet_v1_101_flownet_rfcn_ucf101(Symbol):
 
         return self.CAM(resnet_features, num_classes)
         
-
+    def heat_map_generate(conv_3x3, weight, index):
+        feature_map = conv_3x3.asnumpy()
+        weight = weight.asnumpy()
+        weight = weight[index,:]
+        heat_map = np.average(feature_map, axis=1, weights=weight)
+        heat_map = np.transpose(heat_map, (1, 2, 0))
+        return heat_map
+    
     def get_train_heat_flow(self,cfg):
 
         # config alias for convenient
@@ -901,9 +908,14 @@ class resnet_v1_101_flownet_rfcn_ucf101(Symbol):
         feat_aft = self.get_resnet_v1(data_aft,is_cam=False)
 
         #CAM
-        heat_bef = self.resnet101_cam(data_bef,num_classes)
-        heat_aft = self.resnet101_cam(data_aft,num_classes)
-
+        fc_bef, conv_bef, weight_bef = self.resnet101_cam(data_bef,num_classes)
+        fc_aft, conv_aft, weight_aft = self.resnet101_cam(data_aft,num_classes)
+        prediction_bef = np.argmax(fc_bef.asnumpy())
+        prediction_aft = np.argmax(fc_aft.asnumpy())
+        heat_bef = heat_map_generate(conv_bef, weight_bef, prediction_bef)
+        heat_bef = heat_map_generate(conv_aft, weight_aft, prediction_aft)
+        
+     
         ### flow
         
         concat_flow_data_1 = mx.symbol.Concat(data / 255.0, data_bef / 255.0, dim=1) #before
