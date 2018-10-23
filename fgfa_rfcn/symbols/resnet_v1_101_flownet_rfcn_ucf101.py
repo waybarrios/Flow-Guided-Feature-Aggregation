@@ -897,35 +897,35 @@ class resnet_v1_101_flownet_rfcn_ucf101(Symbol):
         num_classes = cfg.dataset.NUM_CLASSES  # need to change to UCF 101
 
         #data
-        data = mx.sym.Variable(name="data")
-        data_bef = mx.sym.Variable(name="data_bef")
-        data_aft = mx.sym.Variable(name="data_aft")
-        im_info = mx.sym.Variable(name="im_info")
-        
+        data = mx.sym.Variable(name="data") #16 frames
+        heatmap = mx.sym.Variable(name='heatmap') #16 heatmaps
+
+        #slice channels
+        data_bef = mx.sym.slice_axis(data, axis=0, begin=0, end=14)
+        data_curr = mx.sym.slice_axis(data, axis=0, begin=1, end=15)
+        data_aft = mx.sym.slice_axis(data, axis=0, begin=2, end=16)
+
+        heat_bef = mx.sym.slice_axis(heatmap, axis=0, begin=0, end=14)
+        heat_curr = mx.sym.slice_axis(heatmap, axis=0, begin=1, end=15)
+        heat_aft =  mx.sym.slice_axis(heatmap, axis=0, begin=2, end=16)
+
+            
         #features
         feat_bef = self.get_resnet_v1(data_bef,is_cam=False)
-        feat_curr = self.get_resnet_v1(data,is_cam=False)
+        feat_curr = self.get_resnet_v1(data_curr,is_cam=False)
         feat_aft = self.get_resnet_v1(data_aft,is_cam=False)
 
-        #CAM
-        fc_bef, conv_bef, weight_bef = self.resnet101_cam(data_bef,num_classes)
-        fc_aft, conv_aft, weight_aft = self.resnet101_cam(data_aft,num_classes)
-        prediction_bef = np.argmax(fc_bef.asnumpy())
-        prediction_aft = np.argmax(fc_aft.asnumpy())
-        heat_bef = heat_map_generate(conv_bef, weight_bef, prediction_bef)
-        heat_bef = heat_map_generate(conv_aft, weight_aft, prediction_aft)
-        
-     
+   
         ### flow
         
-        concat_flow_data_1 = mx.symbol.Concat(data / 255.0, data_bef / 255.0, dim=1) #before
-        concat_flow_data_2 = mx.symbol.Concat(data / 255.0, data_aft / 255.0, dim=1) #after 
+        concat_flow_data_1 = mx.symbol.Concat(data_curr / 255.0, data_bef / 255.0, dim=1) #before
+        concat_flow_data_2 = mx.symbol.Concat(data_curr / 255.0, data_aft / 255.0, dim=1) #after 
         flow_bef = self.get_flownet(concat_flow_data_1)
         flow_aft = self.get_flownet(concat_flow_data_2)
-
+        import ipdb;ipdb.set_trace()
         #flow + heatmap
-        flow_heat_bef = mx.symbol.Concat(flow_bef,heat_bef, dim=0)
-        flow_heat_aft = mx.symbol.Concat(flow_aft,heat_aft, dim=0)
+        flow_heat_bef = mx.symbol.Concat(flow_bef,heat_bef, dim=1)
+        flow_heat_aft = mx.symbol.Concat(flow_aft,heat_aft, dim=1)
 
         #conv_1x1
         fusion_bef =mx.symbol.Convolution(name='fusion_bef', data=flow_heat_bef, num_filter=1, pad=(0, 0),
@@ -942,7 +942,12 @@ class resnet_v1_101_flownet_rfcn_ucf101(Symbol):
         warp_conv_feat_bef = mx.sym.BilinearSampler(data=feat_bef, grid=flow_heat_grid_bef, name='warp_conv_feat_bef')
         warp_conv_feat_aft = mx.sym.BilinearSampler(data=feat_aft, grid=flow_heat_grid_aft, name='warp_conv_feat_aft')
 
-        return warp_conv_feat_bef,feat_curr,warp_conv_feat_aft
+        concat_features = mx.symbol.Concat(warp_conv_feat_bef,feat_curr,warp_conv_feat_aft, dim=1)
+
+        features_reduced = mx.symbol.Convolution(name='features_reduced', data=concat_features, num_filter=256, pad=(0, 0),
+                                            kernel=(1, 1), stride=(1, 1), no_bias=False)
+
+        return features_reduced
 
     def get_train_symbol(self, cfg):
         # config alias for convenient
