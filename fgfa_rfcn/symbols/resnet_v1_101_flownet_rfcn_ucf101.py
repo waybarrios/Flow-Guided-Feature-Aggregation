@@ -767,7 +767,7 @@ class resnet_v1_101_flownet_rfcn_ucf101(Symbol):
                                          stride=(1, 1), no_bias=False)
         em_ReLU2 = mx.symbol.Activation(name='em_ReLU2', data=em_conv2, act_type='relu')
 
-        em_conv3 = mx.symbol.Convolution(name='em_conv3', data=em_ReLU2, num_filter=2048, pad=(0, 0), kernel=(1, 1),
+        em_conv3 = mx.symbol.Convolution(name='em_conv3', data=em_ReLU2, num_filter=1024, pad=(0, 0), kernel=(1, 1),
                                          stride=(1, 1), no_bias=False)
 
         return em_conv3
@@ -883,14 +883,11 @@ class resnet_v1_101_flownet_rfcn_ucf101(Symbol):
 
         return self.CAM(resnet_features, num_classes)
         
-    def heat_map_generate(conv_3x3, weight, index):
-        feature_map = conv_3x3.asnumpy()
-        weight = weight.asnumpy()
-        weight = weight[index,:]
-        heat_map = np.average(feature_map, axis=1, weights=weight)
-        heat_map = np.transpose(heat_map, (1, 2, 0))
-        return heat_map
-    
+    def fusion_layer(self,concat_feature):
+
+        return mx.symbol.Convolution(name='conv_fusion_1x1', data=concat_feature, num_filter=1, pad=(0, 0),
+                                        kernel=(1, 1), stride=(1, 1), no_bias=False)
+
     def get_train_heat_flow(self,cfg):
 
         # config alias for convenient
@@ -899,55 +896,67 @@ class resnet_v1_101_flownet_rfcn_ucf101(Symbol):
         #data
         data = mx.sym.Variable(name="data") #16 frames
         heatmap = mx.sym.Variable(name='heatmap') #16 heatmaps
+        label = mx.sym.Variable(name='label') 
 
         #slice channels
-        data_bef = mx.sym.slice_axis(data, axis=0, begin=0, end=14)
-        data_curr = mx.sym.slice_axis(data, axis=0, begin=1, end=15)
-        data_aft = mx.sym.slice_axis(data, axis=0, begin=2, end=16)
-
-        heat_bef = mx.sym.slice_axis(heatmap, axis=0, begin=0, end=14)
-        heat_curr = mx.sym.slice_axis(heatmap, axis=0, begin=1, end=15)
-        heat_aft =  mx.sym.slice_axis(heatmap, axis=0, begin=2, end=16)
+        heat_bef = mx.sym.slice_axis(heatmap, axis=0, begin=0, end=14) #14 heatmaps 1 channel
+        heat_curr = mx.sym.slice_axis(heatmap, axis=0, begin=1, end=15) #14 heatmaps 1 channel
+        heat_aft =  mx.sym.slice_axis(heatmap, axis=0, begin=2, end=16) #14 heatmaps 1 channel
 
             
         #features
-        feat_bef = self.get_resnet_v1(data_bef,is_cam=False)
-        feat_curr = self.get_resnet_v1(data_curr,is_cam=False)
-        feat_aft = self.get_resnet_v1(data_aft,is_cam=False)
+        features = self.get_resnet_v1(data, is_cam=False)
+        feat_bef = mx.sym.slice_axis(features, axis=0, begin=0, end=14) #14
+        feat_curr = mx.sym.slice_axis(features, axis=0, begin=1, end=15) #14
+        feat_aft = mx.sym.slice_axis(features, axis=0, begin=2, end=16) #14
 
+        
    
         ### flow
-        
         concat_flow_data_1 = mx.symbol.Concat(data_curr / 255.0, data_bef / 255.0, dim=1) #before
         concat_flow_data_2 = mx.symbol.Concat(data_curr / 255.0, data_aft / 255.0, dim=1) #after 
-        flow_bef = self.get_flownet(concat_flow_data_1)
-        flow_aft = self.get_flownet(concat_flow_data_2)
-        import ipdb;ipdb.set_trace()
-        #flow + heatmap
-        flow_heat_bef = mx.symbol.Concat(flow_bef,heat_bef, dim=1)
-        flow_heat_aft = mx.symbol.Concat(flow_aft,heat_aft, dim=1)
+        concat_flow_data = mx.symbol.Concat(concat_flow_data_1, concat_flow_data_2, dim=0)
+        flow = self.get_flownet(concat_flow_data)
+        flow = mx.sym.SliceChannel(flow, axis=0, num_outputs=2)
+        
+        flow_bef = mx.sym.SliceChannel(flow[0], axis=1, num_outputs=2)
+        flow_aft = mx.sym.SliceChannel(flow[1], axis=1, num_outputs=2)
 
-        #conv_1x1
-        fusion_bef =mx.symbol.Convolution(name='fusion_bef', data=flow_heat_bef, num_filter=1, pad=(0, 0),
-                                            kernel=(1, 1), stride=(1, 1), no_bias=False)
+        concat_bef_1 = mx.symbol.Concat(heat_bef,flow_bef[0], dim=1)
+        concat_bef_2 = mx.symbol.Concat(heat_bef,flow_bef[1], dim=1)
+        concat_aft_1 = mx.symbol.Concat(heat_aft,flow_aft[0], dim=1)
+        concat_aft_2 = mx.symbol.Concat(heat_aft,flow_aft[1], dim=1)
 
-        fusion_aft =mx.symbol.Convolution(name='fusion_aft', data=flow_heat_bef, num_filter=1, pad=(0, 0),
-                                            kernel=(1, 1), stride=(1, 1), no_bias=False)
+        fusion_bef_1 = self.fusion_layer(concat_bef_1)
+        fusion_bef_2 = self.fusion_layer(concat_bef_2)
+        fusion_bef = mx.symbol.Concat(fusion_bef_1,fusion_bef_2,dim=1) #2 channels
+
+        fusion_aft_1 = self.fusion_layer(concat_aft_1)
+        fusion_aft_2 = self.fusion_layer(concat_aft_2)
+        fusion_aft = mx.symbol.Concat(fusion_aft_1,fusion_aft_2,dim=1) #2 channels
+
 
         #warping
-
         flow_heat_grid_bef = mx.sym.GridGenerator(data=fusion_bef, transform_type='warp', name='flow_heat_grid_bef')
         flow_heat_grid_aft = mx.sym.GridGenerator(data=fusion_aft, transform_type='warp', name='flow_heat_grid_aft')
-
         warp_conv_feat_bef = mx.sym.BilinearSampler(data=feat_bef, grid=flow_heat_grid_bef, name='warp_conv_feat_bef')
         warp_conv_feat_aft = mx.sym.BilinearSampler(data=feat_aft, grid=flow_heat_grid_aft, name='warp_conv_feat_aft')
 
-        concat_features = mx.symbol.Concat(warp_conv_feat_bef,feat_curr,warp_conv_feat_aft, dim=1)
+        concat_features = mx.symbol.Concat(feat_curr,warp_conv_feat_bef,warp_conv_feat_aft, dim=1)
 
-        features_reduced = mx.symbol.Convolution(name='features_reduced', data=concat_features, num_filter=256, pad=(0, 0),
-                                            kernel=(1, 1), stride=(1, 1), no_bias=False)
+        features_reduced = self.get_embednet(concat_features)
 
-        return features_reduced
+        feat_redu_reshape = mx.sym.reshape(features_reduced,shape=(-1,))
+
+        #classification
+        fc_weights = mx.symbol.Variable('fc_weights', init=mx.init.Xavier())
+        fc_bias = mx.sym.Variable(name='fc_bias', lr_mult=0.0)
+        fc_feat = mx.sym.FullyConnected(data=feat_redu_reshape, name='fc_feat', num_hidden=num_classes,
+                                                    bias=fc_bias, weight=fc_weights)
+
+        softmax = mx.sym.SoftmaxOutput(data=fc_feat, label=label, name='softmax')
+       
+        return softmax
 
     def get_train_symbol(self, cfg):
         # config alias for convenient
@@ -1260,6 +1269,12 @@ class resnet_v1_101_flownet_rfcn_ucf101(Symbol):
                                                          shape=self.arg_shape_dict['em_conv3_weight'])
         arg_params['em_conv3_bias'] = mx.nd.zeros(shape=self.arg_shape_dict['em_conv3_bias'])
 
+        arg_params['conv_fusion_1x1_weight'] = mx.random.normal(0, 0.01, shape=self.arg_shape_dict['conv_fusion_1x1_weight'])
+        arg_params['fc_weights'] = mx.random.normal(0, 0.01, shape=self.arg_shape_dict['fc_weights'])
+        arg_params['fc_bias'] = mx.nd.zeros(shape=self.arg_shape_dict['fc_bias'])
+
+
+        """
         arg_params['rpn_cls_score_weight'] = mx.random.normal(0, 0.01,
                                                               shape=self.arg_shape_dict['rpn_cls_score_weight'])
         arg_params['rpn_cls_score_bias'] = mx.nd.zeros(shape=self.arg_shape_dict['rpn_cls_score_bias'])
@@ -1271,3 +1286,4 @@ class resnet_v1_101_flownet_rfcn_ucf101(Symbol):
         arg_params['rfcn_cls_bias'] = mx.nd.zeros(shape=self.arg_shape_dict['rfcn_cls_bias'])
         arg_params['rfcn_bbox_weight'] = mx.random.normal(0, 0.01, shape=self.arg_shape_dict['rfcn_bbox_weight'])
         arg_params['rfcn_bbox_bias'] = mx.nd.zeros(shape=self.arg_shape_dict['rfcn_bbox_bias'])
+        """
