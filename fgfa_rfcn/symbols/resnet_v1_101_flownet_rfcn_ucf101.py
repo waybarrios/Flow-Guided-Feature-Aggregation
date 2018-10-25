@@ -767,7 +767,7 @@ class resnet_v1_101_flownet_rfcn_ucf101(Symbol):
                                          stride=(1, 1), no_bias=False)
         em_ReLU2 = mx.symbol.Activation(name='em_ReLU2', data=em_conv2, act_type='relu')
 
-        em_conv3 = mx.symbol.Convolution(name='em_conv3', data=em_ReLU2, num_filter=1024, pad=(0, 0), kernel=(1, 1),
+        em_conv3 = mx.symbol.Convolution(name='em_conv3', data=em_ReLU2, num_filter=512, pad=(0, 0), kernel=(1, 1),
                                          stride=(1, 1), no_bias=False)
 
         return em_conv3
