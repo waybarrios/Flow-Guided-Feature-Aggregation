@@ -1,18 +1,18 @@
 ---
 MXNET_VERSION: ""
-output_path: "./output/fgfa_rfcn/imagenet_vid"
+output_path: "/data/weik/FGFA/output/fgfa_rfcn/imagenet_vid"
 symbol: resnet_v1_101_flownet_rfcn
 gpus: '0,1,2,3'
 CLASS_AGNOSTIC: true
 SCALES:
-- 600
-- 1000
+- 240
+- 320
 default:
   frequent: 100
   kvstore: device
 network:
-  pretrained: "./model/pretrained_model/resnet_v1_101"
-  pretrained_flow: "./model/pretrained_model/flownet"
+  pretrained: "/home/weik/Documents/Deep-Feature-Flow//model/pretrained_model/resnet_v1_101"
+  pretrained_flow: "/home/weik/Documents/Deep-Feature-Flow//model/pretrained_model/flownet"
   pretrained_epoch: 0
   PIXEL_MEANS:
   - 103.06
@@ -48,12 +48,12 @@ network:
 dataset:
   NUM_CLASSES: 31
   dataset: ImageNetVID
-  dataset_path: "./data/ILSVRC2015"
+  dataset_path: "/data/ILSVRC2015/"
   image_set: DET_train_30classes+VID_train_15frames
-  root_path: "./data"
+  root_path: "/data/weik/FGFA/data/"
   test_image_set: VID_val_videos
   proposal: rpn
-  motion_iou_path: './lib/dataset/imagenet_vid_groundtruth_motion_iou.mat'
+  motion_iou_path: '/home/weik/PycharmProjects/FGFA/lib//dataset/imagenet_vid_groundtruth_motion_iou.mat'
   enable_detailed_eval: true
 TRAIN:
   lr: 0.00025
