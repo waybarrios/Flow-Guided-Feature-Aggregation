@@ -66,8 +66,8 @@ def train_net(args, ctx, pretrained, pretrained_flow, epoch, prefix, begin_epoch
     config.symbol = 'resnet_v1_101_flownet_rfcn_ucf101'
     shutil.copy2(os.path.join(curr_path, 'symbols', config.symbol + '.py'), final_output_path)
     sym_instance = eval(config.symbol + '.' + config.symbol)()
-    sym= sym_instance.get_train_heat_flow(config)
-    feat_sym=sym.get_internals()['cam_softmax_output']
+    sym=sym_instance.get_train_heat_flow(config)
+    feat_sym=sym.get_internals()['softmax_output']
 
     # setup multi-gpu
     batch_size = len(ctx)
