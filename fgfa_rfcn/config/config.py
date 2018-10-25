@@ -24,7 +24,7 @@ config.gpus = ''
 config.CLASS_AGNOSTIC = True
 config.SCALES = [(240, 320)]  # first is scale (the shorter side); second is max size
 config.n_samples_for_each_video = 1
-config.sample_duration = 16
+config.sample_duration = 8
 config.sample_step = 16
 
 # default training

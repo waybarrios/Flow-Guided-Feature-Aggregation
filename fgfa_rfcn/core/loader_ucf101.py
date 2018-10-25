@@ -188,11 +188,11 @@ class TrainLoader(mx.io.DataIter):
 
     @property
     def provide_data(self):
-        return [[(k, v.shape) for k, v in zip(self.data_name, self.data[i])][0] for i in xrange(len(self.data))]
+        return [[(k, v.shape) for k, v in zip(self.data_name, self.data[i])] for i in xrange(len(self.data))]
 
     @property
     def provide_label(self):
-        return [[(k, v.shape) for k, v in zip(self.label_name, self.label[i])][0] for i in xrange(len(self.data))]
+        return [[(k, v.shape) for k, v in zip(self.label_name, self.label[i])] for i in xrange(len(self.data))]
 
     @property
     def provide_data_single(self):
@@ -380,7 +380,7 @@ class TrainLoader(mx.io.DataIter):
         num_images = len(iroidb['images'])
         processed_ims = []
         processed_hms = []
-        processed_labels = int(iroidb['label'])
+        processed_labels = int(iroidb['label'])-1
         roi_rec = iroidb
         processed_roidb = roi_rec.copy()
         scale_ind = random.randrange(len(config.SCALES))

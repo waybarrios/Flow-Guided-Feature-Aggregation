@@ -897,21 +897,21 @@ class resnet_v1_101_flownet_rfcn_ucf101(Symbol):
         data = mx.sym.Variable(name="data") #16 frames
         heatmap = mx.sym.Variable(name='heatmap') #16 heatmaps
         label = mx.sym.Variable(name='label')
-        data_bef = mx.sym.slice_axis(data, axis=0, begin=0, end=14) #14 heatmaps 3 ch
-        data_curr = mx.sym.slice_axis(data, axis=0, begin=1, end=15) #14 heatmaps 3 ch
-        data_aft =  mx.sym.slice_axis(data, axis=0, begin=2, end=16) #14 heatmaps 3 ch 
+        data_bef = mx.sym.slice_axis(data, axis=0, begin=0, end=cfg.sample_duration-2) #14 heatmaps 3 ch
+        data_curr = mx.sym.slice_axis(data, axis=0, begin=1, end=cfg.sample_duration-1) #14 heatmaps 3 ch
+        data_aft =  mx.sym.slice_axis(data, axis=0, begin=2, end=cfg.sample_duration) #14 heatmaps 3 ch
 
         #slice channels
-        heat_bef = mx.sym.slice_axis(heatmap, axis=0, begin=0, end=14) #14 heatmaps 1 channel
-        heat_curr = mx.sym.slice_axis(heatmap, axis=0, begin=1, end=15) #14 heatmaps 1 channel
-        heat_aft =  mx.sym.slice_axis(heatmap, axis=0, begin=2, end=16) #14 heatmaps 1 channel
+        heat_bef = mx.sym.slice_axis(heatmap, axis=0, begin=0, end=cfg.sample_duration-2) #14 heatmaps 1 channel
+        heat_curr = mx.sym.slice_axis(heatmap, axis=0, begin=1, end=cfg.sample_duration-1) #14 heatmaps 1 channel
+        heat_aft =  mx.sym.slice_axis(heatmap, axis=0, begin=2, end=cfg.sample_duration) #14 heatmaps 1 channel
 
             
         #features
         features = self.get_resnet_v1(data, is_cam=False)
-        feat_bef = mx.sym.slice_axis(features, axis=0, begin=0, end=14) #14
-        feat_curr = mx.sym.slice_axis(features, axis=0, begin=1, end=15) #14
-        feat_aft = mx.sym.slice_axis(features, axis=0, begin=2, end=16) #14
+        feat_bef = mx.sym.slice_axis(features, axis=0, begin=0, end=cfg.sample_duration-2) #14
+        feat_curr = mx.sym.slice_axis(features, axis=0, begin=1, end=cfg.sample_duration-1) #14
+        feat_aft = mx.sym.slice_axis(features, axis=0, begin=2, end=cfg.sample_duration) #14
 
         
    

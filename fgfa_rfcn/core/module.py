@@ -1002,7 +1002,7 @@ class MutableModule(BaseModule):
 
         # get input_shapes
         if is_train:
-            input_shapes = [dict([data_batch.provide_data[i]] + [data_batch.provide_label[i]]) for i in xrange(len(self._context))]
+            input_shapes = [dict(data_batch.provide_data[i] + data_batch.provide_label[i]) for i in xrange(len(self._context))]
         else:
             input_shapes = [dict(data_batch.provide_data[i]) for i in xrange(len(data_batch.provide_data))]
         # decide if shape changed
