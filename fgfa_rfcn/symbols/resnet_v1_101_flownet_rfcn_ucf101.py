@@ -947,7 +947,7 @@ class resnet_v1_101_flownet_rfcn_ucf101(Symbol):
 
         features_reduced = self.get_embednet(concat_features)
 
-        feat_redu_reshape = mx.sym.reshape(features_reduced,shape=(-1,))
+        feat_redu_reshape = mx.sym.reshape(features_reduced,shape=(1,-1))
 
         #classification
         fc_weights = mx.symbol.Variable('fc_weights', init=mx.init.Xavier())
@@ -1273,6 +1273,7 @@ class resnet_v1_101_flownet_rfcn_ucf101(Symbol):
                                                          shape=self.arg_shape_dict['em_conv3_weight'])
         arg_params['em_conv3_bias'] = mx.nd.zeros(shape=self.arg_shape_dict['em_conv3_bias'])
 
+        arg_params['conv_fusion_1x1_bias'] = mx.nd.zeros(shape=self.arg_shape_dict['conv_fusion_1x1_bias'])
         arg_params['conv_fusion_1x1_weight'] = mx.random.normal(0, 0.01, shape=self.arg_shape_dict['conv_fusion_1x1_weight'])
         arg_params['fc_weights'] = mx.random.normal(0, 0.01, shape=self.arg_shape_dict['fc_weights'])
         arg_params['fc_bias'] = mx.nd.zeros(shape=self.arg_shape_dict['fc_bias'])

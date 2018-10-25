@@ -173,8 +173,7 @@ class TrainLoader(mx.io.DataIter):
         self.index = np.arange(self.size)
 
         # decide data and label names
-        self.data_name = ['data']
-        self.heatmap_name = ['heatmap']
+        self.data_name = ['data', 'heatmap']
         self.label_name = ['label']
 
         # status variable for synchronization between get_data and get_label
@@ -198,10 +197,6 @@ class TrainLoader(mx.io.DataIter):
     @property
     def provide_data_single(self):
         return [(k, v.shape) for k, v in zip(self.data_name, self.data[0])]
-
-    @property
-    def provide_heatmap_single(self):
-        return [(k, v.shape) for k, v in zip(self.heatmap_name, self.heatmap[0])]
 
     @property
     def provide_label_single(self):
@@ -257,10 +252,8 @@ class TrainLoader(mx.io.DataIter):
             rst.append(self.parfetch(iroidb))
 
         all_data = [_['data'] for _ in rst]
-        all_heatmap = [_['heatmap'] for _ in rst]
         all_label = [_['label'] for _ in rst]
         self.data = [[mx.nd.array(data[key]) for key in self.data_name] for data in all_data]
-        self.heatmap = [[mx.nd.array(heatmap[key]) for key in self.heatmap_name] for heatmap in all_heatmap]
         self.label = [[mx.nd.array([label[key]]) for key in self.label_name] for label in all_label]
 
     def parfetch(self, iroidb):
@@ -270,11 +263,10 @@ class TrainLoader(mx.io.DataIter):
 
         #im_info = np.array([roidb[0]['im_info']], dtype=np.float32)
 
-        data = {'data': imgs}
-        heatmap = {'heatmap': hms}
+        data = {'data': imgs, 'heatmap': hms}
         label = {'label': labels}
 
-        return {'data': data, 'heatmap': heatmap, 'label': label}
+        return {'data': data, 'label': label}
 
     def transform(self, im, pixel_means):
         """
@@ -415,15 +407,16 @@ class TrainLoader(mx.io.DataIter):
             im_info.append([im_tensor.shape[1], im_tensor.shape[2], im_scale])
 
             # heat-map loading
-            
+            #target_size = 15
+            #max_size = 20
             heatmap_path = roi_rec['images'][i].replace('JPG', 'HeatMap')
             assert os.path.exists(heatmap_path), '%s does not exist'.format(heatmap_path)
-            im = cv2.imread(heatmap_path, cv2.IMREAD_GRAYSCALE | cv2.IMREAD_IGNORE_ORIENTATION)
+            im_heatmap = cv2.imread(heatmap_path, cv2.IMREAD_GRAYSCALE | cv2.IMREAD_IGNORE_ORIENTATION)
             if iroidb['flipped']:
                 im = im[:, ::-1, :]
-            im, im_scale = resize(im, 15, 20, stride=config.network.IMAGE_STRIDE)
-            im_tensor = self.transform_norm(im)
-            processed_hms.append(im_tensor)
+            im_heatmap, im_heatmap_scale = resize(im_heatmap, 15, 20, stride=config.network.IMAGE_STRIDE)
+            im_heatmap_tensor = self.transform_norm(im_heatmap)
+            processed_hms.append(im_heatmap_tensor)
 
         processed_roidb['im_info'] = im_info
 
