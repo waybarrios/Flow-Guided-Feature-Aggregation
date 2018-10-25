@@ -79,16 +79,16 @@ def train_net(args, ctx, pretrained, pretrained_flow, epoch, prefix, begin_epoch
 
     # load dataset and prepare imdb for training
     config.dataset.dataset = 'UCF101'
-    config.dataset.root_path = '/data/weik/data/'
+    config.dataset.root_path = '/data/weik/FGFA/data/'
     config.dataset.dataset_path = '/data_ssd2/datasets/UCF101/JPG/'
     config.dataset.traintestlist_path = '/data_ssd2/datasets/UCF101/ucfTrainTestList/'
     config.TRAIN.FLIP = False
     split = '01'
-    gtdb = load_gt_imdb(config.dataset.dataset, config.dataset.root_path, config.dataset.dataset_path,
+    gtdb, gtviddb = load_gt_imdb(config.dataset.dataset, config.dataset.root_path, config.dataset.dataset_path,
                         config.dataset.traintestlist_path, split=split, flip=config.TRAIN.FLIP)
 
     # load training data
-    train_data = TrainLoader(feat_sym, gtdb, config, batch_size=64, shuffle=True, ctx=ctx, aspect_grouping=True)
+    train_data = TrainLoader(feat_sym, gtviddb, config, batch_size=64, shuffle=True, ctx=ctx, aspect_grouping=True)
 
     data_shape_dict = dict(train_data.provide_data_single + train_data.provide_label_single)
     pprint.pprint(data_shape_dict)
