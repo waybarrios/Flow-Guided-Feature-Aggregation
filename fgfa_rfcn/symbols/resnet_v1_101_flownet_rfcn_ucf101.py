@@ -897,15 +897,14 @@ class resnet_v1_101_flownet_rfcn_ucf101(Symbol):
         data = mx.sym.Variable(name="data") #16 frames
         heatmap = mx.sym.Variable(name='heatmap') #16 heatmaps
         label = mx.sym.Variable(name='label')
-        heat_resized = mx.sym.contrib.BilinearResize2D(heatmap, height=15, width=20)
         data_bef = mx.sym.slice_axis(data, axis=0, begin=0, end=14) #14 heatmaps 3 ch
         data_curr = mx.sym.slice_axis(data, axis=0, begin=1, end=15) #14 heatmaps 3 ch
         data_aft =  mx.sym.slice_axis(data, axis=0, begin=2, end=16) #14 heatmaps 3 ch 
 
         #slice channels
-        heat_bef = mx.sym.slice_axis(heat_resized, axis=0, begin=0, end=14) #14 heatmaps 1 channel
-        heat_curr = mx.sym.slice_axis(heat_resized, axis=0, begin=1, end=15) #14 heatmaps 1 channel
-        heat_aft =  mx.sym.slice_axis(heat_resized, axis=0, begin=2, end=16) #14 heatmaps 1 channel
+        heat_bef = mx.sym.slice_axis(heatmap, axis=0, begin=0, end=14) #14 heatmaps 1 channel
+        heat_curr = mx.sym.slice_axis(heatmap, axis=0, begin=1, end=15) #14 heatmaps 1 channel
+        heat_aft =  mx.sym.slice_axis(heatmap, axis=0, begin=2, end=16) #14 heatmaps 1 channel
 
             
         #features
@@ -950,7 +949,7 @@ class resnet_v1_101_flownet_rfcn_ucf101(Symbol):
 
         features_reduced = self.get_embednet(concat_features)
 
-        feat_redu_reshape = mx.sym.reshape(features_reduced,shape=(-1,))
+        feat_redu_reshape = mx.sym.reshape(features_reduced,shape=(1,-1))
 
         #classification
         fc_weights = mx.symbol.Variable('fc_weights', init=mx.init.Xavier())
@@ -1276,6 +1275,7 @@ class resnet_v1_101_flownet_rfcn_ucf101(Symbol):
                                                          shape=self.arg_shape_dict['em_conv3_weight'])
         arg_params['em_conv3_bias'] = mx.nd.zeros(shape=self.arg_shape_dict['em_conv3_bias'])
 
+        arg_params['conv_fusion_1x1_bias'] = mx.nd.zeros(shape=self.arg_shape_dict['conv_fusion_1x1_bias'])
         arg_params['conv_fusion_1x1_weight'] = mx.random.normal(0, 0.01, shape=self.arg_shape_dict['conv_fusion_1x1_weight'])
         arg_params['fc_weights'] = mx.random.normal(0, 0.01, shape=self.arg_shape_dict['fc_weights'])
         arg_params['fc_bias'] = mx.nd.zeros(shape=self.arg_shape_dict['fc_bias'])
