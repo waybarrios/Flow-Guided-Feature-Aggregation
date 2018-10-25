@@ -925,18 +925,16 @@ class resnet_v1_101_flownet_rfcn_ucf101(Symbol):
         flow_bef = mx.sym.SliceChannel(flow[0], axis=1, num_outputs=2)
         flow_aft = mx.sym.SliceChannel(flow[1], axis=1, num_outputs=2)
 
-        concat_bef_1 = mx.symbol.Concat(heat_bef,flow_bef[0], dim=1)
-        concat_bef_2 = mx.symbol.Concat(heat_bef,flow_bef[1], dim=1)
-        concat_aft_1 = mx.symbol.Concat(heat_aft,flow_aft[0], dim=1)
+        concat_bef_1 = mx.symbol.Concat(heat_bef,flow_bef[0], dim=1) #14
+        concat_bef_2 = mx.symbol.Concat(heat_bef,flow_bef[1], dim=1) #14
+        concat_aft_1 = mx.symbol.Concat(heat_aft,flow_aft[0], dim=1) #
         concat_aft_2 = mx.symbol.Concat(heat_aft,flow_aft[1], dim=1)
 
-        fusion_bef_1 = self.fusion_layer(concat_bef_1)
-        fusion_bef_2 = self.fusion_layer(concat_bef_2)
-        fusion_bef = mx.symbol.Concat(fusion_bef_1,fusion_bef_2,dim=1) #2 channels
-
-        fusion_aft_1 = self.fusion_layer(concat_aft_1)
-        fusion_aft_2 = self.fusion_layer(concat_aft_2)
-        fusion_aft = mx.symbol.Concat(fusion_aft_1,fusion_aft_2,dim=1) #2 channels
+        fusion_concat = mx.symbol.Concat(concat_bef_1,concat_bef_2,concat_aft_1,concat_aft_2,dim=0)
+        fusion_res = self.fusion_layer(fusion_concat)
+        fusion_res_cat = mx.sym.SliceChannel(fusion_res,axis=0,num_outputs=4)
+        fusion_bef = mx.symbol.Concat(fusion_res_cat[0],fusion_res_cat[1],dim=1) #2 channels
+        fusion_aft = mx.symbol.Concat(fusion_res_cat[2],fusion_res_cat[3],dim=1) #2 channels
 
 
         #warping
