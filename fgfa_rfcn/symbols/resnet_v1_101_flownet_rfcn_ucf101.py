@@ -955,8 +955,11 @@ class resnet_v1_101_flownet_rfcn_ucf101(Symbol):
                                                     bias=fc_bias, weight=fc_weights)
 
         softmax = mx.sym.SoftmaxOutput(data=fc_feat, label=label, name='softmax')
+
+        group = mx.sym.Group([softmax])
+        self.sym = group
        
-        return softmax
+        return group
 
     def get_train_symbol(self, cfg):
         # config alias for convenient
