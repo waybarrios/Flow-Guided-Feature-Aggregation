@@ -415,8 +415,8 @@ class TrainLoader(mx.io.DataIter):
             im_info.append([im_tensor.shape[1], im_tensor.shape[2], im_scale])
 
             # heat-map loading
-            #target_size = 15
-            #max_size = 20
+            target_size = 15
+            max_size = 20
             heatmap_path = roi_rec['images'][i].replace('JPG', 'HeatMap')
             assert os.path.exists(heatmap_path), '%s does not exist'.format(heatmap_path)
             im = cv2.imread(heatmap_path, cv2.IMREAD_GRAYSCALE | cv2.IMREAD_IGNORE_ORIENTATION)
