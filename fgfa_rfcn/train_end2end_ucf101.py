@@ -90,7 +90,7 @@ def train_net(args, ctx, pretrained, pretrained_flow, epoch, prefix, begin_epoch
     # load training data
     train_data = TrainLoader(feat_sym, gtviddb, config, batch_size=4, shuffle=True, ctx=ctx, aspect_grouping=True)
 
-    data_shape_dict = dict(train_data.provide_data_single + train_data.provide_label_single)
+    data_shape_dict = dict(train_data.provide_data_single + train_data.provide_heatmap_single + train_data.provide_label_single)
     pprint.pprint(data_shape_dict)
     sym_instance.infer_shape(data_shape_dict)
     # load and initialize params
