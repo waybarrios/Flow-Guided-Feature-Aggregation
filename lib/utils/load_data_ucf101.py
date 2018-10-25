@@ -15,6 +15,7 @@ def load_gt_imdb(dataset_name, root_path, dataset_path, traintestlist_path, resu
     """ load ground truth roidb """
     imdb = eval(dataset_name)(root_path, dataset_path, traintestlist_path, result_path, split)
     gtdb = imdb.gt_db()
+    gtviddb = imdb.gt_vid_db()
     if flip:
         gtdb = imdb.append_flipped_images(gtdb)
-    return gtdb
+    return gtdb, gtviddb
