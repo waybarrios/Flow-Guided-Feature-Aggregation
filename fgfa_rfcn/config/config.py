@@ -22,7 +22,10 @@ config.output_path = ''
 config.symbol = ''
 config.gpus = ''
 config.CLASS_AGNOSTIC = True
-config.SCALES = [(600, 1000)]  # first is scale (the shorter side); second is max size
+config.SCALES = [(240, 320)]  # first is scale (the shorter side); second is max size
+config.n_samples_for_each_video = 1
+config.sample_duration = 16
+config.sample_step = 16
 
 # default training
 config.default = edict()
@@ -56,7 +59,7 @@ config.dataset.root_path = './data'
 config.dataset.dataset_path = './data/ILSVRC2015'
 config.dataset.motion_iou_path = './lib/dataset/imagenet_vid_groundtruth_motion_iou.mat'
 config.dataset.enable_detailed_eval = True
-config.dataset.NUM_CLASSES = 31
+config.dataset.NUM_CLASSES = 101
 
 
 config.TRAIN = edict()
