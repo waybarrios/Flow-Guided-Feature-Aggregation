@@ -173,7 +173,7 @@ class TrainLoader(mx.io.DataIter):
         self.index = np.arange(self.size)
 
         # decide data and label names
-        self.data_name = ['data']
+        self.data_name = ['data', 'heatmap']
         self.label_name = ['label']
 
         # status variable for synchronization between get_data and get_label
@@ -205,21 +205,7 @@ class TrainLoader(mx.io.DataIter):
     def reset(self):
         self.cur = 0
         if self.shuffle:
-            if self.aspect_grouping:
-                widths = np.array([r['width'] for r in self.roidb])
-                heights = np.array([r['height'] for r in self.roidb])
-                horz = (widths >= heights)
-                vert = np.logical_not(horz)
-                horz_inds = np.where(horz)[0]
-                vert_inds = np.where(vert)[0]
-                inds = np.hstack((np.random.permutation(horz_inds), np.random.permutation(vert_inds)))
-                extra = inds.shape[0] % self.batch_size
-                inds_ = np.reshape(inds[:-extra], (-1, self.batch_size))
-                row_perm = np.random.permutation(np.arange(inds_.shape[0]))
-                inds[:-extra] = np.reshape(inds_[row_perm, :], (-1,))
-                self.index = inds
-            else:
-                np.random.shuffle(self.index)
+            np.random.shuffle(self.index)
 
     def iter_next(self):
         return self.cur + self.batch_size <= self.size
@@ -245,6 +231,10 @@ class TrainLoader(mx.io.DataIter):
 
 
     def get_batch_individual(self):
+        """
+        batch_size only support 1 for each GPU
+        :return:
+        """
         cur_from = self.cur
         cur_to = min(cur_from + self.batch_size, self.size)
         roidb = [self.roidb[self.index[i]] for i in range(cur_from, cur_to)]
@@ -260,22 +250,21 @@ class TrainLoader(mx.io.DataIter):
         for idx, islice in enumerate(slices):
             iroidb = [roidb[i] for i in range(islice.start, islice.stop)]
             rst.append(self.parfetch(iroidb))
+
         all_data = [_['data'] for _ in rst]
         all_label = [_['label'] for _ in rst]
         self.data = [[mx.nd.array(data[key]) for key in self.data_name] for data in all_data]
-        self.label = [[mx.nd.array(label[key]) for key in self.label_name] for label in all_label]
+        self.label = [[mx.nd.array([label[key]]) for key in self.label_name] for label in all_label]
 
     def parfetch(self, iroidb):
         # get testing data for multigpu
 
-        imgs, labels, roidb = self.get_images_label(iroidb, self.cfg)
-        im_array = imgs
-        label_array = labels
+        imgs, hms, labels, roidb = self.get_video_label(iroidb, self.cfg)
+
         #im_info = np.array([roidb[0]['im_info']], dtype=np.float32)
 
-        data = {'data': im_array}
-        label = {'label': label_array}
-
+        data = {'data': imgs, 'heatmap': hms}
+        label = {'label': labels}
 
         return {'data': data, 'label': label}
 
@@ -290,6 +279,19 @@ class TrainLoader(mx.io.DataIter):
         im_tensor = np.zeros((3, im.shape[0], im.shape[1]))
         for i in range(3):
             im_tensor[i, :, :] = im[:, :, 2 - i] - pixel_means[2 - i]
+        return im_tensor
+
+    def transform_norm(self, im):
+        """
+        transform into mxnet tensor
+        substract pixel size and transform to correct format
+        :param im: [height, width, channel] in BGR
+        :param pixel_means: [B, G, R pixel means]
+        :return: [batch, channel, height, width]
+        """
+        im_tensor = np.zeros((1, im.shape[0], im.shape[1]))
+        im_tensor[0, :, :] = im[:, :] / 255.0
+
         return im_tensor
 
     def get_images_label(self, iroidb, config):
@@ -330,3 +332,91 @@ class TrainLoader(mx.io.DataIter):
             processed_roidb.append(new_rec)
 
         return processed_ims, processed_labels, processed_roidb
+
+
+    def TemporalCenterCrop(self, frame_indices, duration):
+        center_index = len(frame_indices) // 2
+        begin_index = max(0, center_index - (duration // 2))
+        end_index = min(begin_index + duration, len(frame_indices))
+
+        out = frame_indices[begin_index:end_index]
+
+        for index in out:
+            if len(out) >= duration:
+                break
+            out.append(index)
+
+        return out
+
+
+    def TemporalRandomCrop(self, frame_indices, duration):
+        rand_end = max(0, len(frame_indices) - duration - 1)
+        begin_index = random.randint(0, rand_end)
+        end_index = min(begin_index + duration, len(frame_indices))
+
+        out = frame_indices[begin_index:end_index]
+
+        for index in out:
+            if len(out) >= duration:
+                break
+            out.append(index)
+
+        return out
+
+    def get_video_label(self, iroidb, config):
+        """
+        preprocess all frames and their hearmap for one video and return processed roidb
+        :param roidb: a list of roidb
+        :return: list of img as in mxnet format
+        roidb add new item['im_info']
+        0 --- x (width, second dim of im)
+        |
+        y (height, first dim of im)
+        """
+        n_batch = len(iroidb)
+        assert(n_batch == 1)
+        iroidb = iroidb[0]
+
+        num_images = len(iroidb['images'])
+        processed_ims = []
+        processed_hms = []
+        processed_labels = int(iroidb['label'])
+        roi_rec = iroidb
+        processed_roidb = roi_rec.copy()
+        scale_ind = random.randrange(len(config.SCALES))
+        target_size = config.SCALES[scale_ind][0]
+        max_size = config.SCALES[scale_ind][1]
+        im_info = []
+
+        n_samples_for_each_video = config.n_samples_for_each_video
+        assert(n_samples_for_each_video == 1)
+        sample_duration = config.sample_duration
+
+        frame_indices = list(range(0, num_images + 1))
+        frame_indices = self.TemporalRandomCrop(frame_indices, sample_duration)
+
+        for i in frame_indices:
+
+            assert os.path.exists(roi_rec['images'][i]), '%s does not exist'.format(roi_rec['images'][i])
+            im = cv2.imread(roi_rec['images'][i], cv2.IMREAD_COLOR|cv2.IMREAD_IGNORE_ORIENTATION)
+            if iroidb['flipped']:
+                im = im[:, ::-1, :]
+            im, im_scale = resize(im, target_size, max_size, stride=config.network.IMAGE_STRIDE)
+            im_tensor = self.transform(im, config.network.PIXEL_MEANS)
+            processed_ims.append(im_tensor)
+            im_info.append([im_tensor.shape[1], im_tensor.shape[2], im_scale])
+
+            # heat-map loading
+            heatmap_path = roi_rec['images'][i].replace('JPG', 'HeatMap')
+            assert os.path.exists(heatmap_path), '%s does not exist'.format(heatmap_path)
+            im = cv2.imread(heatmap_path, cv2.IMREAD_GRAYSCALE | cv2.IMREAD_IGNORE_ORIENTATION)
+            if iroidb['flipped']:
+                im = im[:, ::-1, :]
+            im, im_scale = resize(im, target_size, max_size, stride=config.network.IMAGE_STRIDE)
+            im_tensor = self.transform_norm(im)
+            processed_hms.append(im_tensor)
+
+        processed_roidb['im_info'] = im_info
+
+        return processed_ims, processed_hms, processed_labels, processed_roidb
+
