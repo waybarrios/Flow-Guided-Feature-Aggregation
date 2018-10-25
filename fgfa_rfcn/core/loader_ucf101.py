@@ -415,14 +415,13 @@ class TrainLoader(mx.io.DataIter):
             im_info.append([im_tensor.shape[1], im_tensor.shape[2], im_scale])
 
             # heat-map loading
-            target_size = 15
-            max_size = 20
+            
             heatmap_path = roi_rec['images'][i].replace('JPG', 'HeatMap')
             assert os.path.exists(heatmap_path), '%s does not exist'.format(heatmap_path)
             im = cv2.imread(heatmap_path, cv2.IMREAD_GRAYSCALE | cv2.IMREAD_IGNORE_ORIENTATION)
             if iroidb['flipped']:
                 im = im[:, ::-1, :]
-            im, im_scale = resize(im, target_size, max_size, stride=config.network.IMAGE_STRIDE)
+            im, im_scale = resize(im, 15, 20, stride=config.network.IMAGE_STRIDE)
             im_tensor = self.transform_norm(im)
             processed_hms.append(im_tensor)
 
