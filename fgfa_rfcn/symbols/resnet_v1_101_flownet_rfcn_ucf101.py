@@ -888,6 +888,30 @@ class resnet_v1_101_flownet_rfcn_ucf101(Symbol):
         return mx.symbol.Convolution(name='conv_fusion_1x1', data=concat_feature, num_filter=1, pad=(0, 0),
                                         kernel=(1, 1), stride=(1, 1), no_bias=False)
 
+    
+
+    def get_train_heat_flow_2(self,cfg):
+
+        # config alias for convenient
+        num_classes = cfg.dataset.NUM_CLASSES  # need to change to UCF 101
+        #data
+        data = mx.sym.Variable(name="data") #16 frames
+        label = mx.sym.Variable(name='label')
+        #features
+        features = self.get_resnet_v1(data, is_cam=False)
+        #classification
+        fc_weights = mx.symbol.Variable('fc_weights', init=mx.init.Xavier())
+        fc_bias = mx.sym.Variable(name='fc_bias', lr_mult=0.0)
+        
+        features
+        fc_feat = mx.sym.FullyConnected(data=features, name='fc_feat', num_hidden=num_classes,
+                                                 bias=fc_bias, weight=fc_weights)
+        softmax = mx.sym.SoftmaxOutput(data=fc_feat, label=label, name='softmax')
+        group = mx.sym.Group([softmax])
+        self.sym = group
+        return group
+
+
     def get_train_heat_flow(self,cfg):
 
         # config alias for convenient
