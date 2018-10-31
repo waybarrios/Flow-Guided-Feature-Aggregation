@@ -970,8 +970,9 @@ class resnet_v1_101_flownet_rfcn_ucf101(Symbol):
 
         features_reduced = self.get_embednet(concat_features)
         
-        re = mx.sym.reshape(features_reduced, shape=(1,-1))
-        fc1 = mx.sym.FullyConnected(name='fc1', data=re, num_hidden=1024)
+        #re = mx.sym.reshape(features_reduced, shape=(1,-1))
+        flatten = mx.sym.flatten(feature_reduced)
+        fc1 = mx.sym.FullyConnected(name='fc1', data=flatten, num_hidden=2048)
         relu6 = mx.sym.Activation(data=fc1, act_type="relu")
         dropout1 = mx.sym.Dropout(data=relu6, p=0.5)
          

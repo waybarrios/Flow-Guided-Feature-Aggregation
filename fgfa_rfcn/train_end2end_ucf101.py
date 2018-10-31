@@ -68,7 +68,6 @@ def train_net(args, ctx, pretrained, pretrained_flow, epoch, prefix, begin_epoch
     sym_instance = eval(config.symbol + '.' + config.symbol)()
     sym=sym_instance.get_train_heat_flow(config)
     feat_sym=sym.get_internals()['softmax_output']
-    import ipdb; ipdb.set_trace()
     # setup multi-gpu
     batch_size = len(ctx)
     input_batch_size = config.TRAIN.BATCH_IMAGES * batch_size
@@ -88,7 +87,7 @@ def train_net(args, ctx, pretrained, pretrained_flow, epoch, prefix, begin_epoch
                         config.dataset.traintestlist_path, split=split, flip=config.TRAIN.FLIP)
 
     # load training data
-    train_data = TrainLoader(feat_sym, gtviddb, config, batch_size=3, shuffle=True, ctx=ctx, aspect_grouping=True)
+    train_data = TrainLoader(feat_sym, gtviddb, config, batch_size=3, shuffle=False, ctx=ctx, aspect_grouping=True)
 
     data_shape_dict = dict(train_data.provide_data_single + train_data.provide_label_single)
     pprint.pprint(data_shape_dict)
@@ -111,7 +110,6 @@ def train_net(args, ctx, pretrained, pretrained_flow, epoch, prefix, begin_epoch
     fixed_param_prefix = config.network.FIXED_PARAMS
     data_names = [k[0] for k in train_data.provide_data_single]
     label_names = [k[0] for k in train_data.provide_label_single]
-    import ipdb;ipdb.set_trace()
     #module
     mod = MutableModule(sym, data_names=data_names, label_names=label_names,
                         logger=logger, context=ctx, max_data_shapes=[train_data.provide_data_single],
@@ -159,7 +157,7 @@ def train_net(args, ctx, pretrained, pretrained_flow, epoch, prefix, begin_epoch
     adam = mx.optimizer.create('adam', learning_rate=base_lr)
     mod.fit(train_data, eval_metric=eval_metrics, epoch_end_callback=epoch_end_callback,
             batch_end_callback=batch_end_callback, kvstore=config.default.kvstore,
-            optimizer='sgd', optimizer_params=(('learning_rate', base_lr),('lr_scheduler',lr_sch),('momentum',config.TRAIN.momentum),), 
+            optimizer=adam, optimizer_params=(('learning_rate', base_lr),), 
             arg_params=arg_params, aux_params=aux_params, begin_epoch=begin_epoch, num_epoch=end_epoch)
 
 
