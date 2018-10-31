@@ -10,10 +10,10 @@ from dataset import *
 from dataset.ucf101 import UCF101
 
 
-def load_gt_imdb(dataset_name, root_path, dataset_path, traintestlist_path, result_path=None, split = '01',
+def load_gt_imdb(dataset_name, root_path, dataset_path, traintestlist_path, result_path=None, split='01', subset='train',
                   flip=False):
     """ load ground truth roidb """
-    imdb = eval(dataset_name)(root_path, dataset_path, traintestlist_path, result_path, split)
+    imdb = eval(dataset_name)(root_path, dataset_path, traintestlist_path, result_path, split, subset)
     gtdb = imdb.gt_db()
     gtviddb = imdb.gt_vid_db()
     if flip:
