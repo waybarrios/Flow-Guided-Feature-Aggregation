@@ -975,7 +975,7 @@ class resnet_v1_101_flownet_rfcn_ucf101(Symbol):
          
         #classification
         re =mx.sym.reshape(dropout1,shape=(1,-1))
-        fc2 = mx.sym.FullyConnected(name='fc2', data=re, num_hidden=num_classes)                                            bias=fc_bias, weight=fc_weights)
+        fc2 = mx.sym.FullyConnected(name='fc2', data=re, num_hidden=num_classes)                                            
         softmax = mx.sym.SoftmaxOutput(data=fc2,label=label, name='softmax')
 
         group = mx.sym.Group([softmax])
