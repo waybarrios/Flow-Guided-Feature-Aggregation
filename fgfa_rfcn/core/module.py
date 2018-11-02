@@ -20,6 +20,7 @@ using shared arrays from the initial module binded with maximum shape.
 import time
 import logging
 import warnings
+import numpy as np
 
 from mxnet import context as ctx
 from mxnet.initializer import Uniform, InitDesc
@@ -944,10 +945,10 @@ class MutableModule(BaseModule):
             for nbatch, data_batch in enumerate(train_data):
                 if monitor is not None:
                     monitor.tic()
-                tmp_label = data_batch.label[0][0].asnumpy()
-                print ("Batch:{0}   Epoch:{1}  ".format(nbatch,epoch))
-                print("label max = {0}, min = {1}".format(tmp_label.max(), tmp_label.min()))
+                tmp_label = [int(data_batch.label[i][0].asnumpy())  for i in range(len(data_batch.label))]
+                print("Batch:{0}   Epoch:{1}  ".format(nbatch,epoch))
                 self.forward_backward(data_batch)
+                print("label gt = {0}, label predict = {1}".format(tmp_label, self.predict_label))
                 self.update()
                 self.update_metric(eval_metric, data_batch.label)
                 
@@ -1024,6 +1025,10 @@ class MutableModule(BaseModule):
             self._curr_module = module
 
         self._curr_module.forward(data_batch, is_train=is_train)
+        self.prob = self._curr_module.get_outputs()[0].asnumpy()
+        self.predict_label = np.argmax(self.prob,axis=1)
+
+
 
     def backward(self, out_grads=None):
         assert self.binded and self.params_initialized
