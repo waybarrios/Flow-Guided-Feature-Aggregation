@@ -24,7 +24,7 @@ config.gpus = ''
 config.CLASS_AGNOSTIC = True
 config.SCALES = [(240, 320)]  # first is scale (the shorter side); second is max size
 config.n_samples_for_each_video = 1
-config.sample_duration = 16
+config.sample_duration = 32
 config.sample_step = 16
 
 # default training
@@ -53,7 +53,7 @@ config.network.FGFA_FEAT_DIM = 1024 + 2048 # 1024 for feature network, 2048 for 
 # dataset related params
 config.dataset = edict()
 config.dataset.dataset = 'ImageNetVID'
-config.dataset.image_set = 'DET_train_30classes+VID_train_15frames'
+config.dataset.image_set = 'UCF101'
 config.dataset.test_image_set = 'VID_val_videos'
 config.dataset.root_path = './data'
 config.dataset.dataset_path = './data/ILSVRC2015'

@@ -941,10 +941,10 @@ class resnet_v1_101_flownet_rfcn_ucf101(Symbol):
 
         fc1 = mx.sym.FullyConnected(name='fc1', data=features_reduced, num_hidden=1024)
         relu6 = mx.sym.Activation(data=fc1, act_type="relu")
-        dropout1 = mx.sym.Dropout(data=relu6, p=0.5)
+        #dropout1 = mx.sym.Dropout(data=relu6, p=0.5)
 
         # classification
-        re = mx.sym.reshape(dropout1, shape=(1, -1))
+        re = mx.sym.reshape(relu6, shape=(1, -1))
         fc2 = mx.sym.FullyConnected(name='fc2', data=re, num_hidden=num_classes)
         softmax = mx.sym.SoftmaxOutput(data=fc2, label=label, name='softmax')
 

@@ -87,7 +87,7 @@ def train_net(args, ctx, pretrained, pretrained_flow, epoch, prefix, begin_epoch
                         config.dataset.traintestlist_path, split=split, flip=config.TRAIN.FLIP)
 
     # load training data
-    train_data = TrainLoader(feat_sym, gtviddb, config, batch_size=3, shuffle=False, ctx=ctx, aspect_grouping=True)
+    train_data = TrainLoader(feat_sym, gtviddb, config, batch_size=4, shuffle=False, ctx=ctx, aspect_grouping=True)
 
     data_shape_dict = dict(train_data.provide_data_single + train_data.provide_label_single)
     pprint.pprint(data_shape_dict)

@@ -475,7 +475,6 @@ class TrainLoader(mx.io.DataIter):
         n_batch = len(iroidb)
         assert(n_batch == 1)
         iroidb = iroidb[0]
-
         num_images = len(iroidb['images'])
         processed_ims = []
         processed_hms = []
@@ -490,8 +489,7 @@ class TrainLoader(mx.io.DataIter):
         n_samples_for_each_video = config.n_samples_for_each_video
         assert(n_samples_for_each_video == 1)
         sample_duration = config.sample_duration
-
-        frame_indices = list(range(0, num_images + 1))
+        frame_indices = list(range(0, num_images))
         frame_indices = self.TemporalRandomCrop(frame_indices, sample_duration)
 
         for i in frame_indices:

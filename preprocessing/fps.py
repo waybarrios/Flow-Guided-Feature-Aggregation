@@ -2,11 +2,9 @@ from __future__ import print_function, division
 import os
 import sys
 import subprocess
+from joblib import Parallel, delayed
 
-
-if __name__=="__main__":
-  dir_path = sys.argv[1]
-  dst_dir_path = sys.argv[2]
+def frm(file_name,dir_path,dst_dir_path):
 
   for file_name in os.listdir(dir_path):
     if '.mp4' not in file_name:
@@ -36,3 +34,18 @@ if __name__=="__main__":
     print(video_file_path, os.path.exists(video_file_path), fps)
     with open(os.path.join(dst_directory_path, 'fps'), 'w') as fps_file:
       fps_file.write('{}\n'.format(fps))
+
+
+  return 
+
+
+if __name__=="__main__":
+  dir_path = sys.argv[1]
+  dst_dir_path = sys.argv[2]
+  n_jobs = int(sys.argv[3])
+  video_lst = os.listdir(dir_path)
+  Parallel(n_jobs=n_jobs)(delayed(frm)(vid,dir_path,dst_dir_path)
+                                for vid in video_lst)
+
+
+
