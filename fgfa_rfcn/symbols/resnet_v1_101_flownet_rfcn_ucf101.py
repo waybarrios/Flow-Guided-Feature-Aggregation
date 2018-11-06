@@ -952,7 +952,30 @@ class resnet_v1_101_flownet_rfcn_ucf101(Symbol):
         self.sym = group
 
         return group
+    def get_train_key(self, cfg):
+        # config alias for convenient
+        num_classes = cfg.dataset.NUM_CLASSES  # need to change to UCF 101
 
+        # data
+        data = mx.sym.Variable(name="data")
+        label = mx.sym.Variable(name='label')
+        data_slice = mx.sym.SliceChannel(data, axis=0, num_outputs=cfg.sample_duration)
+        data_clip = mx.sym.slice_axis(data, axis=0, begin=1, end=cfg.sample_duration)
+
+        data_key = data_slice[0]
+        feat_key = self.get_resnet_v1(data_curr, is_cam=False)
+
+        concat_flow_data = mx.symbol.Concat(data_key / 255.0, data_clip / 255.0, dim=1)
+
+        #flow = self.get_flownet(concat_flow_data)
+        #flow_grid = mx.sym.GridGenerator(data=flow, transform_type='warp', name='flow_grid')
+        #warp_conv_feat = mx.sym.BilinearSampler(data=feat_key, grid=flow_grid, name='warping_feat')
+
+        #softmax = mx.sym.SoftmaxOutput(data=fc2, label=label, name='softmax')
+        group = mx.sym.Group([concat_flow_data])
+        self.sym = group
+
+        return group
     def get_train_symbol(self, cfg):
         # config alias for convenient
         num_classes = cfg.dataset.NUM_CLASSES
