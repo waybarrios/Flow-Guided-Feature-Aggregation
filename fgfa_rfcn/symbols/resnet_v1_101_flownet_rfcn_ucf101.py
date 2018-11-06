@@ -883,7 +883,23 @@ class resnet_v1_101_flownet_rfcn_ucf101(Symbol):
 
         return mx.symbol.Convolution(name='conv_fusion_1x1', data=concat_feature, num_filter=1, pad=(0, 0),
                                      kernel=(1, 1), stride=(1, 1), no_bias=False)
+    def inception_3d(self,net):
+        branch0 = mx.symbol.Convolution(name='branch0', data=net, num_filter=256, pad=(0, 0, 0), kernel=(1, 1, 1),
+                                                   stride=(1, 1, 1), no_bias=False)
+        conv3d_branch1 = mx.symbol.Convolution(name='conv3d_branch1', data=net, num_filter=160, pad=(0, 0, 0), kernel=(1, 1, 1),
+                                                   stride=(1, 1, 1), no_bias=False)
+        branch1 = mx.symbol.Convolution(name='branch1', data=conv3d_branch1, num_filter=320, pad=(1, 1, 1), kernel=(3, 3, 3),
+                                                   stride=(1, 1, 1), no_bias=False)
+        conv3d_branch2 = mx.symbol.Convolution(name='conv3d_branch2', data=net, num_filter=32, pad=(0, 0, 0), kernel=(1, 1, 1),
+                                                   stride=(1, 1, 1), no_bias=False)
+        branch2 = mx.symbol.Convolution(name='branch2', data=conv3d_branch2, num_filter=128, pad=(1, 1, 1), kernel=(3, 3, 3),
+                                                   stride=(1, 1, 1), no_bias=False)
 
+        pool_branch3 = mx.symbol.Pooling(name='pool_branch3', data=net, pad=(1,1,1), kernel=(3,3,3), stride=(1,1,1), pool_type='max')
+        branch3 = mx.symbol.Convolution(name='branch3', data=pool_branch3, num_filter=128, pad=(0, 0, 0), kernel=(1, 1, 1),
+                                                   stride=(1, 1, 1), no_bias=False)
+
+        return mx.symbol.Concat(branch0,branch1,branch2,branch3,dim=1)
     def get_train_heat_flow(self, cfg):
 
         # config alias for convenient
@@ -963,16 +979,24 @@ class resnet_v1_101_flownet_rfcn_ucf101(Symbol):
         data_clip = mx.sym.slice_axis(data, axis=0, begin=1, end=cfg.sample_duration)
 
         data_key = data_slice[0]
-        feat_key = self.get_resnet_v1(data_curr, is_cam=False)
+        feat_key = self.get_resnet_v1(data_key, is_cam=False)
+        feat_keys = mx.symbol.Concat(*[feat_key]*(cfg.sample_duration-1), dim=0)
+        data_keys = mx.symbol.Concat(*[data_key]*(cfg.sample_duration-1), dim=0)
+        concat_flow_data = mx.symbol.Concat(data_keys / 255.0, data_clip / 255.0, dim=1)
 
-        concat_flow_data = mx.symbol.Concat(data_key / 255.0, data_clip / 255.0, dim=1)
-
-        #flow = self.get_flownet(concat_flow_data)
-        #flow_grid = mx.sym.GridGenerator(data=flow, transform_type='warp', name='flow_grid')
-        #warp_conv_feat = mx.sym.BilinearSampler(data=feat_key, grid=flow_grid, name='warping_feat')
-
-        #softmax = mx.sym.SoftmaxOutput(data=fc2, label=label, name='softmax')
-        group = mx.sym.Group([concat_flow_data])
+        flow = self.get_flownet(concat_flow_data)
+        flow_grid = mx.sym.GridGenerator(data=flow, transform_type='warp', name='flow_grid')
+        warp_conv_feat = mx.sym.BilinearSampler(data=feat_keys, grid=flow_grid, name='warping_feat')
+        concat_feat = mx.symbol.Concat(feat_key,warp_conv_feat,dim=0)
+        re = mx.symbol.reshape(concat_feat,shape=(1,1024,cfg.sample_duration,15,20))
+        inception = self.inception_3d(re)
+        global_pool= mx.sym.Pooling(name='global_pooling', data=inception,kernel=(2,15,20), stride=(2,1,1) ,pool_type='avg')
+        flatten = mx.sym.flatten(global_pool)
+        fc1 = mx.sym.FullyConnected(name='fc1', data=flatten, num_hidden=4096)
+        relu6 = mx.sym.Activation(data=fc1, act_type="relu")
+        fc2 = mx.sym.FullyConnected(name='fc2', data=relu6, num_hidden=num_classes)
+        softmax = mx.sym.SoftmaxOutput(data=fc2, label=label, name='softmax')
+        group = mx.sym.Group([softmax])
         self.sym = group
 
         return group
@@ -1347,6 +1371,7 @@ class resnet_v1_101_flownet_rfcn_ucf101(Symbol):
         arg_params['feat_conv_3x3_weight'] = mx.random.normal(0, 0.01,
                                                               shape=self.arg_shape_dict['feat_conv_3x3_weight'])
         arg_params['feat_conv_3x3_bias'] = mx.nd.zeros(shape=self.arg_shape_dict['feat_conv_3x3_bias'])
+        """
         arg_params['em_conv1_weight'] = mx.random.normal(0, self.get_msra_std(self.arg_shape_dict['em_conv1_weight']),
                                                          shape=self.arg_shape_dict['em_conv1_weight'])
         arg_params['em_conv1_bias'] = mx.nd.zeros(shape=self.arg_shape_dict['em_conv1_bias'])
@@ -1360,10 +1385,23 @@ class resnet_v1_101_flownet_rfcn_ucf101(Symbol):
         arg_params['conv_fusion_1x1_bias'] = mx.nd.zeros(shape=self.arg_shape_dict['conv_fusion_1x1_bias'])
         arg_params['conv_fusion_1x1_weight'] = mx.random.normal(0, 0.01,
                                                                 shape=self.arg_shape_dict['conv_fusion_1x1_weight'])
+        """
         arg_params['fc1_weight'] = mx.random.normal(0, 0.01, shape=self.arg_shape_dict['fc1_weight'])
         arg_params['fc1_bias'] = mx.nd.zeros(shape=self.arg_shape_dict['fc1_bias'])
 
         arg_params['fc2_weight'] = mx.random.normal(0, 0.01, shape=self.arg_shape_dict['fc2_weight'])
         arg_params['fc2_bias'] = mx.nd.zeros(shape=self.arg_shape_dict['fc2_bias'])
+        arg_params['branch0_weight'] = mx.random.normal(0, 0.01, shape=self.arg_shape_dict['branch0_weight'])
+        arg_params['conv3d_branch1_weight'] = mx.random.normal(0, 0.01, shape=self.arg_shape_dict['conv3d_branch1_weight'])
+        arg_params['branch1_weight'] = mx.random.normal(0, 0.01, shape=self.arg_shape_dict['branch1_weight'])
+        arg_params['conv3d_branch2_weight'] = mx.random.normal(0, 0.01, shape=self.arg_shape_dict['conv3d_branch2_weight'])
+        arg_params['branch2_weight'] = mx.random.normal(0, 0.01, shape=self.arg_shape_dict['branch2_weight'])
+        arg_params['branch3_weight'] = mx.random.normal(0, 0.01, shape=self.arg_shape_dict['branch3_weight'])
+         
 
-
+        arg_params['branch0_bias'] = mx.nd.zeros(shape=self.arg_shape_dict['branch0_bias'])
+        arg_params['conv3d_branch1_bias'] = mx.nd.zeros(shape=self.arg_shape_dict['conv3d_branch1_bias'])
+        arg_params['branch1_bias'] = mx.nd.zeros(shape=self.arg_shape_dict['branch1_bias'])
+        arg_params['conv3d_branch2_bias'] = mx.nd.zeros(shape=self.arg_shape_dict['conv3d_branch2_bias'])
+        arg_params['branch2_bias'] = mx.nd.zeros(shape=self.arg_shape_dict['branch2_bias'])
+        arg_params['branch3_bias'] = mx.nd.zeros(shape=self.arg_shape_dict['branch3_bias'])

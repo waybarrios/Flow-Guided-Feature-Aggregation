@@ -12,7 +12,7 @@
 # --------------------------------------------------------
 
 import _init_paths
-
+import numpy as np
 import cv2
 import argparse
 import pandas as pd
@@ -89,14 +89,14 @@ def test_net(cfg, dataset, image_set, ctx, prefix, epoch, shuffle):
 
     # load dataset and prepare imdb for training
     config.dataset.dataset = 'UCF101'
-    config.dataset.root_path = '/data/weik/FGFA/data/'
-    config.dataset.dataset_path = '/data_ssd2/datasets/UCF101/JPG/'
-    config.dataset.traintestlist_path = '/data_ssd2/datasets/UCF101/ucfTrainTestList/'
+    config.dataset.root_path = '/data/waybarrios/FGFA_CACHE'
+    config.dataset.dataset_path = '/data/weik/UCF101/JPG/'
+    config.dataset.traintestlist_path = '/data/weik/UCF101/ucfTrainTestList/'
     config.TRAIN.FLIP = False
     split = '01'
     classes = load_labels(os.path.join(config.dataset.traintestlist_path, 'classInd.txt'))
     gtdb, gtviddb = load_gt_imdb(config.dataset.dataset, config.dataset.root_path, config.dataset.dataset_path,
-                                 config.dataset.traintestlist_path, split=split, subset='test', flip=config.TRAIN.FLIP)
+                                 config.dataset.traintestlist_path, split=split, subset='train', flip=config.TRAIN.FLIP)
 
 
     # load symbol
@@ -105,6 +105,7 @@ def test_net(cfg, dataset, image_set, ctx, prefix, epoch, shuffle):
     feat_sym_instance = eval(cfg.symbol + '.' + cfg.symbol)()
 
     # load model
+    epoch = 20
     arg_params, aux_params = load_param(prefix, epoch, process=True)
 
     feat_sym = feat_sym_instance.get_test_symbol(cfg)
@@ -114,7 +115,12 @@ def test_net(cfg, dataset, image_set, ctx, prefix, epoch, shuffle):
         os.makedirs(cache_path)
 
     final_outputs = []
+    count_tp = 0
     for sample_idx, roidb in enumerate(gtviddb):
+        if sample_idx<3000:
+            continue
+        if sample_idx>=6000:
+            break
         print('{0}--->{1}'.format(sample_idx, roidb['video_name']))
         # get test data iter
         results = {
@@ -127,13 +133,19 @@ def test_net(cfg, dataset, image_set, ctx, prefix, epoch, shuffle):
             feat_predictors = get_predictor(feat_sym, feat_sym_instance, cfg, arg_params, aux_params, test_datas, [ctx[0]])
             output = feat_predictors.predict(data_batch)[0]
             results['clips'].append(output['softmax_output'].asnumpy())
+        
+        prediction = np.asanyarray(results['clips'])
+        import ipdb; ipdb.set_trace()
+        prediction = np.transpose(prediction, [0,2,1])
+        prediction_index = np.argmax(np.average(prediction, axis=0))
 
+        prediction_name = classes[prediction_index]
+        print('GT:{0}--->Prediction:{1}'.format(roidb['video_name'], prediction_name))
         final_outputs.append(results)
 
-        if sample_idx % 1000 == 0:
-            print('{0}: writing the prediction results...'.format(sample_idx))
-            with open(os.path.join(cache_path, 'test.pkl'), 'wb') as f:
-                pkl.dump(final_outputs, f)
+        
+     #with open(os.path.join(cache_path, 'test.pkl'), 'wb') as f:
+      #       pkl.dump(final_outputs, f)
 
 
 def main():
