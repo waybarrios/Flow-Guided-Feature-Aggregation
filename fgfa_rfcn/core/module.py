@@ -287,7 +287,7 @@ class Module(BaseModule):
         self._params_dirty = False
 
         # copy the initialized parameters to devices
-        self._exec_group.set_params(self._arg_params, self._aux_params,allow_extra=False)
+        self._exec_group.set_params(self._arg_params, self._aux_params)
 
     def set_params(self, arg_params, aux_params, allow_missing=False, force_init=True, allow_extra=False):
         """Assign parameter and aux state values.
