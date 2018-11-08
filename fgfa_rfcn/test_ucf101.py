@@ -59,9 +59,7 @@ def get_predictor(sym, sym_instance, cfg, arg_params, aux_params, test_data, ctx
     # decide maximum shape
     data_names = [k[0] for k in test_data.provide_data_single]
     label_names = None
-    max_data_shape = [[('data', (16, 3, max([v[0] for v in cfg.SCALES]), max([v[1] for v in cfg.SCALES]))),
-                       ('heatmap', (16, 1, max([v[0] for v in [(15, 20)]]), max([v[1] for v in [(15, 20)]]))),
-                       ]]
+    max_data_shape = [[('data', (cfg.sample_duration, 3, max([v[0] for v in cfg.SCALES]), max([v[1] for v in cfg.SCALES])))]]
 
     # create predictor
     predictor = Predictor(sym, data_names, label_names,
@@ -78,26 +76,23 @@ def load_labels(label_csv_path):
         labels.append(data.iloc[i, data.columns.get_loc(1)])
     return labels
 
-def test_net(cfg, dataset, image_set, ctx, prefix, epoch, shuffle):
+
+def test_net(cfg, dataset, image_set, ctx, prefix, epoch, shuffle, sample_idx_start=0, sample_idx_end=500):
     logger, final_output_path = create_logger(config.output_path, args.cfg, config.dataset.image_set)
     prefix = os.path.join(final_output_path, prefix)
-
+    prefix = '/data/waybarrios/FGFA_OUTPUT/UCF101_KEY/conf_fgfa/UCF101_SPLIT1/fgfa_cmu'
 
     # print config
     pprint.pprint(cfg)
     logger.info('testing cfg:{}\n'.format(pprint.pformat(cfg)))
 
-    # load dataset and prepare imdb for training
-    config.dataset.dataset = 'UCF101'
-    config.dataset.root_path = '/data/waybarrios/FGFA_CACHE'
-    config.dataset.dataset_path = '/data/weik/UCF101/JPG/'
+    # load dataset and prepare imdb for trainin
     config.dataset.traintestlist_path = '/data/weik/UCF101/ucfTrainTestList/'
     config.TRAIN.FLIP = False
     split = '01'
     classes = load_labels(os.path.join(config.dataset.traintestlist_path, 'classInd.txt'))
-    gtdb, gtviddb = load_gt_imdb(config.dataset.dataset, config.dataset.root_path, config.dataset.dataset_path,
-                                 config.dataset.traintestlist_path, split=split, subset='train', flip=config.TRAIN.FLIP)
-
+    gtdb, gtviddb = load_gt_imdb(dataset, config.dataset.root_path, config.dataset.dataset_path,
+                                 config.dataset.traintestlist_path, split=split, subset='test', flip=config.TRAIN.FLIP)
 
     # load symbol
     config.symbol = 'resnet_v1_101_flownet_rfcn_ucf101'
@@ -105,22 +100,25 @@ def test_net(cfg, dataset, image_set, ctx, prefix, epoch, shuffle):
     feat_sym_instance = eval(cfg.symbol + '.' + cfg.symbol)()
 
     # load model
-    epoch = 20
     arg_params, aux_params = load_param(prefix, epoch, process=True)
 
-    feat_sym = feat_sym_instance.get_test_symbol(cfg)
+    feat_sym = feat_sym_instance.get_test_key(cfg)
 
     cache_path = os.path.join(config.dataset.root_path, 'cache_predict', 'split' + split)
     if not os.path.exists(cache_path):
         os.makedirs(cache_path)
 
     final_outputs = []
-    count_tp = 0
+    count = 0
+
+    sample_len = sample_idx_end - sample_idx_start
     for sample_idx, roidb in enumerate(gtviddb):
-        if sample_idx<3000:
+        if sample_idx < sample_idx_start:
             continue
-        if sample_idx>=6000:
+        if sample_idx > sample_idx_end:
             break
+
+
         print('{0}--->{1}'.format(sample_idx, roidb['video_name']))
         # get test data iter
         results = {
@@ -128,33 +126,41 @@ def test_net(cfg, dataset, image_set, ctx, prefix, epoch, shuffle):
             'clips': []
         }
 
-        test_datas = TestLoader([roidb], cfg, batch_size=1, shuffle=shuffle, ctx=[ctx[0]])
+        test_datas = TestLoader([roidb], cfg, batch_size=1, shuffle=shuffle, ctx=ctx)
+        feat_predictors = get_predictor(feat_sym, feat_sym_instance, cfg, arg_params, aux_params, test_datas, ctx)
         for nbatch, data_batch in enumerate(test_datas):
-            feat_predictors = get_predictor(feat_sym, feat_sym_instance, cfg, arg_params, aux_params, test_datas, [ctx[0]])
+
             output = feat_predictors.predict(data_batch)[0]
             results['clips'].append(output['softmax_output'].asnumpy())
         
         prediction = np.asanyarray(results['clips'])
-        import ipdb; ipdb.set_trace()
         prediction = np.transpose(prediction, [0,2,1])
         prediction_index = np.argmax(np.average(prediction, axis=0))
 
         prediction_name = classes[prediction_index]
         print('GT:{0}--->Prediction:{1}'.format(roidb['video_name'], prediction_name))
+        if prediction_name in roidb['video_name']:
+            count = count + 1
+            print('{0}/{1}'.format(count, sample_len))
+
         final_outputs.append(results)
 
-        
-     #with open(os.path.join(cache_path, 'test.pkl'), 'wb') as f:
-      #       pkl.dump(final_outputs, f)
+        if (sample_idx+1) % 500 == 0:
+            print('writing the prediction results...')
+            with open(os.path.join(cache_path, 'test_part{0}_{1}_{2}_{3}.pkl'.format(ctx[0], sample_idx, sample_idx_start, sample_idx_end)), 'wb') as f:
+                pkl.dump(final_outputs, f)
+
+    print('writing the prediction results...')
+    with open(os.path.join(cache_path, 'test_part{0}_{1}_{2}.pkl'.format(ctx[0], sample_idx_start, sample_idx_end)), 'wb') as f:
+        pkl.dump(final_outputs, f)
 
 
-def main():
+def main(ctx_idx=0, sample_idx_start=0, sample_idx_end=500):
     ctx = [mx.gpu(int(i)) for i in config.gpus.split(',')]
+    ctx = [ctx[ctx_idx]]
     print args
 
-    logger, final_output_path = create_logger(config.output_path, args.cfg, config.dataset.test_image_set)
-
-    test_net(config, config.dataset.dataset, config.dataset.test_image_set, ctx, config.TRAIN.model_prefix, config.TEST.test_epoch, shuffle=False)
+    test_net(config, config.dataset.dataset, config.dataset.test_image_set, ctx, config.TRAIN.model_prefix, config.TEST.test_epoch, shuffle=False, sample_idx_start=sample_idx_start, sample_idx_end=sample_idx_end)
 
 
 if __name__ == '__main__':

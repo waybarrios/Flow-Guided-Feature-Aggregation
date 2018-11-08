@@ -883,6 +883,7 @@ class resnet_v1_101_flownet_rfcn_ucf101(Symbol):
 
         return mx.symbol.Convolution(name='conv_fusion_1x1', data=concat_feature, num_filter=1, pad=(0, 0),
                                      kernel=(1, 1), stride=(1, 1), no_bias=False)
+
     def inception_3d(self,net):
         branch0 = mx.symbol.Convolution(name='branch0', data=net, num_filter=256, pad=(0, 0, 0), kernel=(1, 1, 1),
                                                    stride=(1, 1, 1), no_bias=False)
@@ -900,6 +901,7 @@ class resnet_v1_101_flownet_rfcn_ucf101(Symbol):
                                                    stride=(1, 1, 1), no_bias=False)
 
         return mx.symbol.Concat(branch0,branch1,branch2,branch3,dim=1)
+
     def get_train_heat_flow(self, cfg):
 
         # config alias for convenient
@@ -968,6 +970,7 @@ class resnet_v1_101_flownet_rfcn_ucf101(Symbol):
         self.sym = group
 
         return group
+    
     def get_train_key(self, cfg):
         # config alias for convenient
         num_classes = cfg.dataset.NUM_CLASSES  # need to change to UCF 101
@@ -1000,6 +1003,39 @@ class resnet_v1_101_flownet_rfcn_ucf101(Symbol):
         self.sym = group
 
         return group
+    
+    def get_test_key(self, cfg):
+        # config alias for convenient
+        num_classes = cfg.dataset.NUM_CLASSES  # need to change to UCF 101
+
+        # data
+        data = mx.sym.Variable(name="data")
+        data_slice = mx.sym.SliceChannel(data, axis=0, num_outputs=cfg.sample_duration)
+        data_clip = mx.sym.slice_axis(data, axis=0, begin=1, end=cfg.sample_duration)
+
+        data_key = data_slice[0]
+        feat_key = self.get_resnet_v1(data_key, is_cam=False)
+        feat_keys = mx.symbol.Concat(*[feat_key]*(cfg.sample_duration-1), dim=0)
+        data_keys = mx.symbol.Concat(*[data_key]*(cfg.sample_duration-1), dim=0)
+        concat_flow_data = mx.symbol.Concat(data_keys / 255.0, data_clip / 255.0, dim=1)
+
+        flow = self.get_flownet(concat_flow_data)
+        flow_grid = mx.sym.GridGenerator(data=flow, transform_type='warp', name='flow_grid')
+        warp_conv_feat = mx.sym.BilinearSampler(data=feat_keys, grid=flow_grid, name='warping_feat')
+        concat_feat = mx.symbol.Concat(feat_key,warp_conv_feat,dim=0)
+        re = mx.symbol.reshape(concat_feat,shape=(1,1024,cfg.sample_duration,15,20))
+        inception = self.inception_3d(re)
+        global_pool= mx.sym.Pooling(name='global_pooling', data=inception,kernel=(2,15,20), stride=(2,1,1) ,pool_type='avg')
+        flatten = mx.sym.flatten(global_pool)
+        fc1 = mx.sym.FullyConnected(name='fc1', data=flatten, num_hidden=4096)
+        relu6 = mx.sym.Activation(data=fc1, act_type="relu")
+        fc2 = mx.sym.FullyConnected(name='fc2', data=relu6, num_hidden=num_classes)
+        softmax = mx.sym.SoftmaxActivation(data=fc2, name='softmax')
+        group = mx.sym.Group([softmax])
+        self.sym = group
+
+        return group
+    
     def get_train_symbol(self, cfg):
         # config alias for convenient
         num_classes = cfg.dataset.NUM_CLASSES

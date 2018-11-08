@@ -192,6 +192,29 @@ def resize(im, target_size, max_size, stride=0, interpolation = cv2.INTER_LINEAR
         padded_im[:im.shape[0], :im.shape[1], :] = im
         return padded_im, im_scale
 
+def resize_keep_ratio(im, target_size_y, target_size_x, interpolation = cv2.INTER_LINEAR):
+    """
+    only resize input image to target size and return scale
+    :param im: BGR image input by opencv
+    :param target_size: one dimensional size (the short side)
+    :param max_size: one dimensional max size (the long side)
+    :param stride: if given, pad the image to designated stride
+    :param interpolation: if given, using given interpolation method to resize image
+    :return:
+    """
+    im_shape = im.shape
+    im_size_y = im_shape[0]
+    im_size_x = im_shape[1]
+
+    im_scale_y = float(target_size_y) / float(im_size_y)
+    im_scale_x = float(target_size_x) / float(im_size_x)
+    im_scale = [im_scale_y, im_scale_x]
+    # prevent bigger axis from being more than max_size:
+
+    im = cv2.resize(im, None, None, fx=im_scale_x, fy=im_scale_y, interpolation=interpolation)
+
+    return im, im_scale
+
 def transform(im, pixel_means):
     """
     transform into mxnet tensor

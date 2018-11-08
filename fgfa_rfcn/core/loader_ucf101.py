@@ -19,7 +19,7 @@ import math
 import os
 import random
 
-from utils.image import tensor_vstack, resize
+from utils.image import tensor_vstack, resize, resize_keep_ratio
 
 class TestLoader(mx.io.DataIter):
     def __init__(self, roidb, config, batch_size=1, shuffle=False, ctx=None, work_load_list=None,):
@@ -74,17 +74,17 @@ class TestLoader(mx.io.DataIter):
         return None
 
     def get_size(self):
-        return int(math.floor((self.ori_roidb[0]['length'] - self.cfg.sample_duration) / self.cfg.sample_step) + 1)
+        return int(max(0, math.floor((self.ori_roidb[0]['length'] - self.cfg.sample_duration) / self.cfg.sample_step)) + 1)
 
     def get_clip_roidb(self):
         clip_roidbs = []
         for idx in self.index:
             clip_roidb = {}
-            clip_roidb['images']  = self.ori_roidb[0]['images'][idx*self.cfg.sample_step:(idx+1)*self.cfg.sample_duration]
+            clip_roidb['images']  = self.ori_roidb[0]['images'][idx*self.cfg.sample_step:idx*self.cfg.sample_step+self.cfg.sample_duration]
             clip_roidb['label']   = self.ori_roidb[0]['label']
             clip_roidb['length']  = self.cfg.sample_duration
             clip_roidb['start']   = idx*self.cfg.sample_step+1
-            clip_roidb['end']     = (idx+1)*self.cfg.sample_duration
+            clip_roidb['end']     = int(idx*self.cfg.sample_step+self.cfg.sample_duration)
             clip_roidb['height']  = self.ori_roidb[0]['height']
             clip_roidb['width']   = self.ori_roidb[0]['width']
             clip_roidb['flipped'] = self.ori_roidb[0]['flipped']
@@ -183,6 +183,19 @@ class TestLoader(mx.io.DataIter):
 
         return im_tensor
 
+    def check_roidb(self, riodb, duration):
+        out = range(len(riodb['images']))
+        tmpriodb = riodb.copy()
+
+        for index in out:
+            if len(tmpriodb['images']) >= duration:
+                break
+
+            tmpriodb['images'].append(tmpriodb['images'][index])
+            out.append(index)
+
+        return tmpriodb
+
     def get_video_label(self, iroidb, config):
         """
         preprocess all frames and their hearmap for one video and return processed roidb
@@ -196,6 +209,8 @@ class TestLoader(mx.io.DataIter):
         n_batch = len(iroidb)
         assert(n_batch == 1)
         iroidb = iroidb[0]
+
+        iroidb = self.check_roidb(iroidb, self.cfg.sample_duration)
 
         num_images = len(iroidb['images'])
         processed_ims = []
@@ -213,7 +228,7 @@ class TestLoader(mx.io.DataIter):
             im = cv2.imread(iroidb['images'][i], cv2.IMREAD_COLOR|cv2.IMREAD_IGNORE_ORIENTATION)
             if iroidb['flipped']:
                 im = im[:, ::-1, :]
-            im, im_scale = resize(im, target_size, max_size, stride=config.network.IMAGE_STRIDE)
+            im, im_scale = resize_keep_ratio(im, target_size, max_size)
             im_tensor = self.transform(im, config.network.PIXEL_MEANS)
             processed_ims.append(im_tensor)
             im_info.append([im_tensor.shape[1], im_tensor.shape[2], im_scale])
@@ -226,7 +241,7 @@ class TestLoader(mx.io.DataIter):
             im_heatmap = cv2.imread(heatmap_path, cv2.IMREAD_GRAYSCALE | cv2.IMREAD_IGNORE_ORIENTATION)
             if iroidb['flipped']:
                 im = im[:, ::-1, :]
-            im_heatmap, im_heatmap_scale = resize(im_heatmap, 15, 20, stride=config.network.IMAGE_STRIDE)
+            im_heatmap, im_heatmap_scale = resize_keep_ratio(im_heatmap, 15, 20)
             im_heatmap_tensor = self.transform_norm(im_heatmap)
             processed_hms.append(im_heatmap_tensor)
 

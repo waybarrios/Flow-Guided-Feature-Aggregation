@@ -16,4 +16,9 @@ sys.path.insert(0, os.path.join(this_dir, '..', '..', 'fgfa_rfcn'))
 import test_ucf101
 
 if __name__ == "__main__":
-    test_ucf101.main()
+    """
+    ctx_idx: gpu index
+    sample_idx_start: the start index of samples for testing
+    sample_idx_end: the end index of samples for testing
+    """
+    test_ucf101.main(ctx_idx=0, sample_idx_start=0, sample_idx_end=3000)
