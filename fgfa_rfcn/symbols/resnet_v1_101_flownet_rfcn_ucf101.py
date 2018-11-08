@@ -978,8 +978,10 @@ class resnet_v1_101_flownet_rfcn_ucf101(Symbol):
         # data
         data = mx.sym.Variable(name="data")
         label = mx.sym.Variable(name='label')
+        heatmap = mx.sym.Variable(name='heatmap')
         data_slice = mx.sym.SliceChannel(data, axis=0, num_outputs=cfg.sample_duration)
         data_clip = mx.sym.slice_axis(data, axis=0, begin=1, end=cfg.sample_duration)
+        heat_clip = mx.sym.slice_axis(heatmap, axis=0, begin=1, end=cfg.sample_duration)
 
         data_key = data_slice[0]
         feat_key = self.get_resnet_v1(data_key, is_cam=False)
@@ -988,8 +990,16 @@ class resnet_v1_101_flownet_rfcn_ucf101(Symbol):
         concat_flow_data = mx.symbol.Concat(data_keys / 255.0, data_clip / 255.0, dim=1)
 
         flow = self.get_flownet(concat_flow_data)
-        flow_grid = mx.sym.GridGenerator(data=flow, transform_type='warp', name='flow_grid')
-        warp_conv_feat = mx.sym.BilinearSampler(data=feat_keys, grid=flow_grid, name='warping_feat')
+        flow_channels = mx.sym.SliceChannel(flow, axis=1, num_outputs=2)
+
+        concat_flow_1 = mx.symbol.Concat(flow_channels[0],heat_clip ,dim=1) 
+        concat_flow_2 = mx.symbol.Concat(flow_channels[1],heat_clip, dim=1) 
+        fusion_concat = mx.symbol.Concat(concat_flow_1,concat_flow_2, dim=0)
+        fusion_res = self.fusion_layer(fusion_concat)
+        fusion_sli= mx.sym.SliceChannel(fusion_res, axis=0, num_outputs=2)
+        fusion = mx.symbol.Concat(fusion_sli[0], fusion_sli[1], dim=1)
+        fusion_grid = mx.sym.GridGenerator(data=fusion, transform_type='warp', name='fusion_grid')
+        warp_conv_feat = mx.sym.BilinearSampler(data=feat_keys, grid=fusion_grid, name='warping_feat')
         concat_feat = mx.symbol.Concat(feat_key,warp_conv_feat,dim=0)
         re = mx.symbol.reshape(concat_feat,shape=(1,1024,cfg.sample_duration,15,20))
         inception = self.inception_3d(re)
@@ -1417,11 +1427,11 @@ class resnet_v1_101_flownet_rfcn_ucf101(Symbol):
         arg_params['em_conv3_weight'] = mx.random.normal(0, self.get_msra_std(self.arg_shape_dict['em_conv3_weight']),
                                                          shape=self.arg_shape_dict['em_conv3_weight'])
         arg_params['em_conv3_bias'] = mx.nd.zeros(shape=self.arg_shape_dict['em_conv3_bias'])
-
+        """
         arg_params['conv_fusion_1x1_bias'] = mx.nd.zeros(shape=self.arg_shape_dict['conv_fusion_1x1_bias'])
         arg_params['conv_fusion_1x1_weight'] = mx.random.normal(0, 0.01,
                                                                 shape=self.arg_shape_dict['conv_fusion_1x1_weight'])
-        """
+       
         arg_params['fc1_weight'] = mx.random.normal(0, 0.01, shape=self.arg_shape_dict['fc1_weight'])
         arg_params['fc1_bias'] = mx.nd.zeros(shape=self.arg_shape_dict['fc1_bias'])
 
