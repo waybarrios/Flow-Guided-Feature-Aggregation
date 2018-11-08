@@ -59,7 +59,9 @@ def get_predictor(sym, sym_instance, cfg, arg_params, aux_params, test_data, ctx
     # decide maximum shape
     data_names = [k[0] for k in test_data.provide_data_single]
     label_names = None
-    max_data_shape = [[('data', (cfg.sample_duration, 3, max([v[0] for v in cfg.SCALES]), max([v[1] for v in cfg.SCALES])))]]
+    max_data_shape = [[('data', (cfg.sample_duration, 3, max([v[0] for v in cfg.SCALES]), max([v[1] for v in cfg.SCALES]))),
+                       ('heatmap', (cfg.sample_duration, 1, max([v[0] for v in [(15, 20)]]), max([v[1] for v in [(15, 20)]]))),
+                       ]]
 
     # create predictor
     predictor = Predictor(sym, data_names, label_names,
@@ -80,7 +82,7 @@ def load_labels(label_csv_path):
 def test_net(cfg, dataset, image_set, ctx, prefix, epoch, shuffle, sample_idx_start=0, sample_idx_end=500):
     logger, final_output_path = create_logger(config.output_path, args.cfg, config.dataset.image_set)
     prefix = os.path.join(final_output_path, prefix)
-    prefix = '/data/waybarrios/FGFA_OUTPUT/UCF101_KEY/conf_fgfa/UCF101_SPLIT1/fgfa_cmu'
+    prefix = '/data/waybarrios/FGFA_OUTPUT/UCF101_KEY_HEAT_FLOW/conf_fgfa/UCF101_SPLIT1/fgfa_cmu'
 
     # print config
     pprint.pprint(cfg)
@@ -104,7 +106,7 @@ def test_net(cfg, dataset, image_set, ctx, prefix, epoch, shuffle, sample_idx_st
 
     feat_sym = feat_sym_instance.get_test_key(cfg)
 
-    cache_path = os.path.join(config.dataset.root_path, 'cache_predict', 'split' + split)
+    cache_path = os.path.join(config.dataset.root_path, 'cache_predict', cfg.method_name, 'split' + split)
     if not os.path.exists(cache_path):
         os.makedirs(cache_path)
 

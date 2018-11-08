@@ -26,6 +26,7 @@ config.SCALES = [(240, 320)]  # first is scale (the shorter side); second is max
 config.n_samples_for_each_video = 1
 config.sample_duration = 32
 config.sample_step = 16
+config.method_name = 'heat_flow'
 
 # default training
 config.default = edict()

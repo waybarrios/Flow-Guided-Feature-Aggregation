@@ -21,4 +21,4 @@ if __name__ == "__main__":
     sample_idx_start: the start index of samples for testing
     sample_idx_end: the end index of samples for testing
     """
-    test_ucf101.main(ctx_idx=0, sample_idx_start=0, sample_idx_end=3000)
+    test_ucf101.main(ctx_idx=0, sample_idx_start=0, sample_idx_end=1000)

@@ -1020,27 +1020,39 @@ class resnet_v1_101_flownet_rfcn_ucf101(Symbol):
 
         # data
         data = mx.sym.Variable(name="data")
+        heatmap = mx.sym.Variable(name='heatmap')
         data_slice = mx.sym.SliceChannel(data, axis=0, num_outputs=cfg.sample_duration)
         data_clip = mx.sym.slice_axis(data, axis=0, begin=1, end=cfg.sample_duration)
+        heat_clip = mx.sym.slice_axis(heatmap, axis=0, begin=1, end=cfg.sample_duration)
 
         data_key = data_slice[0]
         feat_key = self.get_resnet_v1(data_key, is_cam=False)
-        feat_keys = mx.symbol.Concat(*[feat_key]*(cfg.sample_duration-1), dim=0)
-        data_keys = mx.symbol.Concat(*[data_key]*(cfg.sample_duration-1), dim=0)
+        feat_keys = mx.symbol.Concat(*[feat_key] * (cfg.sample_duration - 1), dim=0)
+        data_keys = mx.symbol.Concat(*[data_key] * (cfg.sample_duration - 1), dim=0)
         concat_flow_data = mx.symbol.Concat(data_keys / 255.0, data_clip / 255.0, dim=1)
 
         flow = self.get_flownet(concat_flow_data)
-        flow_grid = mx.sym.GridGenerator(data=flow, transform_type='warp', name='flow_grid')
-        warp_conv_feat = mx.sym.BilinearSampler(data=feat_keys, grid=flow_grid, name='warping_feat')
-        concat_feat = mx.symbol.Concat(feat_key,warp_conv_feat,dim=0)
-        re = mx.symbol.reshape(concat_feat,shape=(1,1024,cfg.sample_duration,15,20))
+        flow_channels = mx.sym.SliceChannel(flow, axis=1, num_outputs=2)
+
+        concat_flow_1 = mx.symbol.Concat(flow_channels[0], heat_clip, dim=1)
+        concat_flow_2 = mx.symbol.Concat(flow_channels[1], heat_clip, dim=1)
+        fusion_concat = mx.symbol.Concat(concat_flow_1, concat_flow_2, dim=0)
+        fusion_res = self.fusion_layer(fusion_concat)
+        fusion_sli = mx.sym.SliceChannel(fusion_res, axis=0, num_outputs=2)
+        fusion = mx.symbol.Concat(fusion_sli[0], fusion_sli[1], dim=1)
+        fusion_grid = mx.sym.GridGenerator(data=fusion, transform_type='warp', name='fusion_grid')
+        warp_conv_feat = mx.sym.BilinearSampler(data=feat_keys, grid=fusion_grid, name='warping_feat')
+        concat_feat = mx.symbol.Concat(feat_key, warp_conv_feat, dim=0)
+        re = mx.symbol.reshape(concat_feat, shape=(1, 1024, cfg.sample_duration, 15, 20))
         inception = self.inception_3d(re)
-        global_pool= mx.sym.Pooling(name='global_pooling', data=inception,kernel=(2,15,20), stride=(2,1,1) ,pool_type='avg')
+        global_pool = mx.sym.Pooling(name='global_pooling', data=inception, kernel=(2, 15, 20), stride=(2, 1, 1),
+                                     pool_type='avg')
         flatten = mx.sym.flatten(global_pool)
         fc1 = mx.sym.FullyConnected(name='fc1', data=flatten, num_hidden=4096)
         relu6 = mx.sym.Activation(data=fc1, act_type="relu")
         fc2 = mx.sym.FullyConnected(name='fc2', data=relu6, num_hidden=num_classes)
         softmax = mx.sym.SoftmaxActivation(data=fc2, name='softmax')
+
         group = mx.sym.Group([softmax])
         self.sym = group
 
