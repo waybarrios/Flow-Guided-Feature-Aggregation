@@ -902,7 +902,7 @@ class resnet_v1_101_flownet_rfcn_ucf101(Symbol):
 
         return mx.symbol.Concat(branch0,branch1,branch2,branch3,dim=1)
 
-     def inception_3d_2(self,net):
+    def inception_3d_2(self,net):
         branch0 = mx.symbol.Convolution(name='branch0', data=net, num_filter=384, pad=(0, 0, 0), kernel=(1, 1, 1),
                                                    stride=(1, 1, 1), no_bias=False)
         conv3d_branch1 = mx.symbol.Convolution(name='conv3d_branch1', data=net, num_filter=192, pad=(0, 0, 0), kernel=(1, 1, 1),
@@ -1081,7 +1081,7 @@ class resnet_v1_101_flownet_rfcn_ucf101(Symbol):
         softmax = mx.sym.SoftmaxOutput(data=fc2, label=label, name='softmax')
         group = mx.sym.Group([softmax])
         self.sym = group
-        
+
         return group
 
     
