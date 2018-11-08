@@ -1391,11 +1391,11 @@ class resnet_v1_101_flownet_rfcn_ucf101(Symbol):
         arg_params['em_conv3_weight'] = mx.random.normal(0, self.get_msra_std(self.arg_shape_dict['em_conv3_weight']),
                                                          shape=self.arg_shape_dict['em_conv3_weight'])
         arg_params['em_conv3_bias'] = mx.nd.zeros(shape=self.arg_shape_dict['em_conv3_bias'])
-
+        """
         arg_params['conv_fusion_1x1_bias'] = mx.nd.zeros(shape=self.arg_shape_dict['conv_fusion_1x1_bias'])
         arg_params['conv_fusion_1x1_weight'] = mx.random.normal(0, 0.01,
                                                                 shape=self.arg_shape_dict['conv_fusion_1x1_weight'])
-        """
+       
         arg_params['fc1_weight'] = mx.random.normal(0, 0.01, shape=self.arg_shape_dict['fc1_weight'])
         arg_params['fc1_bias'] = mx.nd.zeros(shape=self.arg_shape_dict['fc1_bias'])
 
