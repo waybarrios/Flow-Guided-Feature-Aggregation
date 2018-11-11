@@ -66,9 +66,9 @@ def train_net(args, ctx, pretrained, pretrained_flow, epoch, prefix, begin_epoch
     config.symbol = 'resnet_v1_101_flownet_rfcn_ucf101'
     shutil.copy2(os.path.join(curr_path, 'symbols', config.symbol + '.py'), final_output_path)
     sym_instance = eval(config.symbol + '.' + config.symbol)()
-    sym=sym_instance.get_train_key(config)
+    sym=sym_instance.get_train_key_flow_cam(config)
     import ipdb;ipdb.set_trace()
-    feat_sym=sym.get_internals()['softmax_output']
+    feat_sym=sym.get_internals()['videoclass_output']
     # setup multi-gpu
     batch_size = len(ctx)
     input_batch_size = config.TRAIN.BATCH_IMAGES * batch_size

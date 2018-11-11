@@ -44,8 +44,8 @@ class TestLoader(mx.io.DataIter):
         self.roidb = self.get_clip_roidb()
 
         # decide data and label names (only for training)
-        self.data_name = ['data','heatmap']
-        self.label_name = ['label']
+        self.data_name = ['data',]#'heatmap']
+        self.label_name = ['label1','label2']
 
         # status variable for synchronization between get_data and get_label
         self.cur = 0
@@ -152,8 +152,8 @@ class TestLoader(mx.io.DataIter):
 
         #im_info = np.array([roidb[0]['im_info']], dtype=np.float32)
 
-        data = {'data': imgs , 'heatmap': hms}
-        label = {'label': labels}
+        data = {'data': imgs} # , 'heatmap': hms}
+        label = {'label1': labels,'label2':labels}
 
         return {'data': data, 'label': label}
 
@@ -287,8 +287,8 @@ class TrainLoader(mx.io.DataIter):
         self.index = np.arange(self.size)
 
         # decide data and label names
-        self.data_name = ['data' , 'heatmap']
-        self.label_name = ['label']
+        self.data_name = ['data' ] #, 'heatmap']
+        self.label_name = ['label1','label2']
 
         # status variable for synchronization between get_data and get_label
         self.cur = 0
@@ -377,8 +377,8 @@ class TrainLoader(mx.io.DataIter):
 
         #im_info = np.array([roidb[0]['im_info']], dtype=np.float32)
 
-        data = {'data': imgs, 'heatmap': hms}
-        label = {'label': labels}
+        data = {'data': imgs} #, 'heatmap': hms}
+        label = {'label1': labels,'label2':labels}
 
         return {'data': data, 'label': label}
 
