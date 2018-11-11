@@ -994,9 +994,10 @@ class resnet_v1_101_flownet_rfcn_ucf101(Symbol):
         flow_data = mx.symbol.Concat(data_keys / 255.0, no_keys / 255.0, dim=1)
         return flow_data
 
-    def warping_function(self,flow,feat_cam):
+    def warping_function(self,flow,feat_cam,duration):
+        feat_keys=mx.symbol.Concat(*[feat_cam]*(duration-1), dim=0)
         flow_grid = mx.sym.GridGenerator(data=flow, transform_type='warp', name='flow_grid')
-        warp_conv_feat = mx.sym.BilinearSampler(data=feat_cam, grid=flow_grid, name='warping_feat')
+        warp_conv_feat = mx.sym.BilinearSampler(data=feat_keys, grid=flow_grid, name='warping_feat')
 
         return warp_conv_feat
     
@@ -1009,22 +1010,16 @@ class resnet_v1_101_flownet_rfcn_ucf101(Symbol):
         # data
         data = mx.sym.Variable(name="data")
         label1 = mx.sym.Variable(name='label1')
-        label1 = mx.symbol.Concat(*[label1]*(num_mini_clips), dim=0)
         label2 = mx.sym.Variable(name='label2')
 
         data_slices = mx.sym.SliceChannel(data, axis=0, num_outputs=4)
         
-        #short video clips
-        data_clip1 = mx.sym.slice_axis(data_slices[0], axis=0, begin=0, end=lenght_mini_clip)
-        data_clip2 = mx.sym.slice_axis(data_slices[1], axis=0, begin=0, end=lenght_mini_clip)
-        data_clip3 = mx.sym.slice_axis(data_slices[2], axis=0, begin=0, end=lenght_mini_clip)
-        data_clip4 = mx.sym.slice_axis(data_slices[3], axis=0, begin=0, end=lenght_mini_clip)
-
         #key frames
-        data_key1 = data_clip1[0]
-        data_key2 = data_clip2[0]
-        data_key3 = data_clip3[0]
-        data_key4 = data_clip4[0]
+        data_key1= mx.sym.slice_axis(data_slices[0], axis=0, begin=0, end=1)
+        data_key2 = mx.sym.slice_axis(data_slices[1], axis=0, begin=0, end=1)
+        data_key3 = mx.sym.slice_axis(data_slices[2], axis=0, begin=0, end=1)
+        data_key4 = mx.sym.slice_axis(data_slices[3], axis=0, begin=0, end=1)
+
 
         #No key frames
         nokey1 = mx.sym.slice_axis(data_slices[0], axis=0, begin=1, end=lenght_mini_clip)
@@ -1035,7 +1030,7 @@ class resnet_v1_101_flownet_rfcn_ucf101(Symbol):
         #cam features
         key_frames = mx.symbol.Concat(data_key1,data_key2,data_key3,data_key4,dim=0)
         feat_keys = self.get_resnet_v1(key_frames, is_cam=True)
-        fc_cam, conv_cam = self.CAM(feat_key,num_classes)
+        fc_cam, conv_cam = self.CAM(feat_keys,num_classes)
         conv_cam_slices = mx.sym.SliceChannel(conv_cam , axis=0, num_outputs=4)
 
         #loss for CAM
@@ -1056,10 +1051,10 @@ class resnet_v1_101_flownet_rfcn_ucf101(Symbol):
 
 
         #warping
-        warp_conv1 = self.warping_function(flow_slices[0],conv_cam_slices[0])
-        warp_conv2 = self.warping_function(flow_slices[1],conv_cam_slices[1])
-        warp_conv3 = self.warping_function(flow_slices[2],conv_cam_slices[2])
-        warp_conv4 = self.warping_function(flow_slices[3],conv_cam_slices[3])
+        warp_conv1 = self.warping_function(flow_slices[0],conv_cam_slices[0],lenght_mini_clip)
+        warp_conv2 = self.warping_function(flow_slices[1],conv_cam_slices[1],lenght_mini_clip)
+        warp_conv3 = self.warping_function(flow_slices[2],conv_cam_slices[2],lenght_mini_clip)
+        warp_conv4 = self.warping_function(flow_slices[3],conv_cam_slices[3],lenght_mini_clip)
         
         concat_feat = mx.symbol.Concat(conv_cam_slices[0],warp_conv1,
                                        conv_cam_slices[1],warp_conv2,
