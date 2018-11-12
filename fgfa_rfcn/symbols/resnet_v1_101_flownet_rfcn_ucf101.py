@@ -1087,7 +1087,6 @@ class resnet_v1_101_flownet_rfcn_ucf101(Symbol):
         nokey6 = mx.sym.slice_axis(data_slices[5], axis=0, begin=1, end=lenght_mini_clip)
         nokey7 = mx.sym.slice_axis(data_slices[6], axis=0, begin=1, end=lenght_mini_clip)
         nokey8 = mx.sym.slice_axis(data_slices[7], axis=0, begin=1, end=lenght_mini_clip)
-        nokey4 = mx.sym.slice_axis(data_slices[8], axis=0, begin=1, end=lenght_mini_clip)
 
         #cam features
         key_frames = mx.symbol.Concat(data_key1,data_key2,data_key3,data_key4,
