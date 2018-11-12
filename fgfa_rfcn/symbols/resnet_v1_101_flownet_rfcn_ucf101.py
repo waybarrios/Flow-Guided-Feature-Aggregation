@@ -903,19 +903,37 @@ class resnet_v1_101_flownet_rfcn_ucf101(Symbol):
         return mx.symbol.Concat(branch0,branch1,branch2,branch3,dim=1)
 
     def inception_3d_2(self,net):
-        branch0 = mx.symbol.Convolution(name='branch02', data=net, num_filter=384, pad=(0, 0, 0), kernel=(1, 1, 1),
+        branch0 = mx.symbol.Convolution(name='branch02', data=net, num_filter=256, pad=(0, 0, 0), kernel=(1, 1, 1),
                                                    stride=(1, 1, 1), no_bias=False)
-        conv3d_branch1 = mx.symbol.Convolution(name='conv3d_branch12', data=net, num_filter=192, pad=(0, 0, 0), kernel=(1, 1, 1),
+        conv3d_branch1 = mx.symbol.Convolution(name='conv3d_branch12', data=net, num_filter=160, pad=(0, 0, 0), kernel=(1, 1, 1),
                                                    stride=(1, 1, 1), no_bias=False)
-        branch1 = mx.symbol.Convolution(name='branch12', data=conv3d_branch1, num_filter=384, pad=(1, 1, 1), kernel=(3, 3, 3),
+        branch1 = mx.symbol.Convolution(name='branch12', data=conv3d_branch1, num_filter=320, pad=(1, 1, 1), kernel=(3, 3, 3),
                                                    stride=(1, 1, 1), no_bias=False)
-        conv3d_branch2 = mx.symbol.Convolution(name='conv3d_branch22', data=net, num_filter=48, pad=(0, 0, 0), kernel=(1, 1, 1),
+        conv3d_branch2 = mx.symbol.Convolution(name='conv3d_branch22', data=net, num_filter=32, pad=(0, 0, 0), kernel=(1, 1, 1),
                                                    stride=(1, 1, 1), no_bias=False)
         branch2 = mx.symbol.Convolution(name='branch22', data=conv3d_branch2, num_filter=128, pad=(1, 1, 1), kernel=(3, 3, 3),
                                                    stride=(1, 1, 1), no_bias=False)
 
         pool_branch3 = mx.symbol.Pooling(name='pool_branch32', data=net, pad=(1,1,1), kernel=(3,3,3), stride=(1,1,1), pool_type='max')
         branch3 = mx.symbol.Convolution(name='branch32', data=pool_branch3, num_filter=128, pad=(0, 0, 0), kernel=(1, 1, 1),
+                                                   stride=(1, 1, 1), no_bias=False)
+
+        return mx.symbol.Concat(branch0,branch1,branch2,branch3,dim=1)
+
+    def inception_3d_3(self,net):
+        branch0 = mx.symbol.Convolution(name='branch03', data=net, num_filter=384, pad=(0, 0, 0), kernel=(1, 1, 1),
+                                                   stride=(1, 1, 1), no_bias=False)
+        conv3d_branch1 = mx.symbol.Convolution(name='conv3d_branch13', data=net, num_filter=192, pad=(0, 0, 0), kernel=(1, 1, 1),
+                                                   stride=(1, 1, 1), no_bias=False)
+        branch1 = mx.symbol.Convolution(name='branch13', data=conv3d_branch1, num_filter=384, pad=(1, 1, 1), kernel=(3, 3, 3),
+                                                   stride=(1, 1, 1), no_bias=False)
+        conv3d_branch2 = mx.symbol.Convolution(name='conv3d_branch23', data=net, num_filter=48, pad=(0, 0, 0), kernel=(1, 1, 1),
+                                                   stride=(1, 1, 1), no_bias=False)
+        branch2 = mx.symbol.Convolution(name='branch23', data=conv3d_branch2, num_filter=128, pad=(1, 1, 1), kernel=(3, 3, 3),
+                                                   stride=(1, 1, 1), no_bias=False)
+
+        pool_branch3 = mx.symbol.Pooling(name='pool_branch33', data=net, pad=(1,1,1), kernel=(3,3,3), stride=(1,1,1), pool_type='max')
+        branch3 = mx.symbol.Convolution(name='branch33', data=pool_branch3, num_filter=128, pad=(0, 0, 0), kernel=(1, 1, 1),
                                                    stride=(1, 1, 1), no_bias=False)
 
         return mx.symbol.Concat(branch0,branch1,branch2,branch3,dim=1)
@@ -1068,9 +1086,9 @@ class resnet_v1_101_flownet_rfcn_ucf101(Symbol):
         #inception
         inception1 = self.inception_3d_1(re)
         inception2 = self.inception_3d_2(inception1)
-
+        inception3 = self.inception_3d_3(inception2)
         #classification
-        global_pool= mx.sym.Pooling(name='global_pooling', data=inception2,kernel=(2,15,20), stride=(2,1,1) ,pool_type='avg')
+        global_pool= mx.sym.Pooling(name='global_pooling', data=inception3,kernel=(2,15,20), stride=(2,1,1) ,pool_type='avg')
         flatten = mx.sym.flatten(global_pool)
         fc1 = mx.sym.FullyConnected(name='fc1', data=flatten, num_hidden=4096)
         relu6 = mx.sym.Activation(data=fc1, act_type="relu")
@@ -1083,49 +1101,7 @@ class resnet_v1_101_flownet_rfcn_ucf101(Symbol):
         return group
 
 
-    def get_train_key(self, cfg):
-        # config alias for convenient
-        num_classes = cfg.dataset.NUM_CLASSES  # need to change to UCF 101
-
-        # data
-        data = mx.sym.Variable(name="data")
-        label = mx.sym.Variable(name='label')
-        heatmap = mx.sym.Variable(name='heatmap')
-        data_slice = mx.sym.SliceChannel(data, axis=0, num_outputs=cfg.sample_duration)
-        data_clip = mx.sym.slice_axis(data, axis=0, begin=1, end=cfg.sample_duration)
-        heat_clip = mx.sym.slice_axis(heatmap, axis=0, begin=1, end=cfg.sample_duration)
-
-        data_key = data_slice[0]
-        feat_key = self.get_resnet_v1(data_key, is_cam=False)
-        feat_keys = mx.symbol.Concat(*[feat_key]*(cfg.sample_duration-1), dim=0)
-        data_keys = mx.symbol.Concat(*[data_key]*(cfg.sample_duration-1), dim=0)
-        concat_flow_data = mx.symbol.Concat(data_keys / 255.0, data_clip / 255.0, dim=1)
-
-        flow = self.get_flownet(concat_flow_data)
-        flow_channels = mx.sym.SliceChannel(flow, axis=1, num_outputs=2)
-
-        concat_flow_1 = mx.symbol.Concat(flow_channels[0],heat_clip ,dim=1) 
-        concat_flow_2 = mx.symbol.Concat(flow_channels[1],heat_clip, dim=1) 
-        fusion_concat = mx.symbol.Concat(concat_flow_1,concat_flow_2, dim=0)
-        fusion_res = self.fusion_layer(fusion_concat)
-        fusion_sli= mx.sym.SliceChannel(fusion_res, axis=0, num_outputs=2)
-        fusion = mx.symbol.Concat(fusion_sli[0], fusion_sli[1], dim=1)
-        fusion_grid = mx.sym.GridGenerator(data=fusion, transform_type='warp', name='fusion_grid')
-        warp_conv_feat = mx.sym.BilinearSampler(data=feat_keys, grid=fusion_grid, name='warping_feat')
-        concat_feat = mx.symbol.Concat(feat_key,warp_conv_feat,dim=0)
-        re = mx.symbol.reshape(concat_feat,shape=(1,1024,cfg.sample_duration,15,20))
-        inception = self.inception_3d(re)
-        global_pool= mx.sym.Pooling(name='global_pooling', data=inception,kernel=(2,15,20), stride=(2,1,1) ,pool_type='avg')
-        flatten = mx.sym.flatten(global_pool)
-        fc1 = mx.sym.FullyConnected(name='fc1', data=flatten, num_hidden=4096)
-        relu6 = mx.sym.Activation(data=fc1, act_type="relu")
-        fc2 = mx.sym.FullyConnected(name='fc2', data=relu6, num_hidden=num_classes)
-        softmax = mx.sym.SoftmaxOutput(data=fc2, label=label, name='softmax')
-        group = mx.sym.Group([softmax])
-        self.sym = group
-
-        return group
-
+    
     
     def get_test_key(self, cfg):
         # config alias for convenient
@@ -1159,237 +1135,7 @@ class resnet_v1_101_flownet_rfcn_ucf101(Symbol):
 
         return group
     
-    def get_train_symbol(self, cfg):
-        # config alias for convenient
-        num_classes = cfg.dataset.NUM_CLASSES
-        num_reg_classes = (2 if cfg.CLASS_AGNOSTIC else num_classes)
-        num_anchors = cfg.network.NUM_ANCHORS
-
-        data = mx.sym.Variable(name="data")
-        data_bef = mx.sym.Variable(name="data_bef")
-        data_aft = mx.sym.Variable(name="data_aft")
-        im_info = mx.sym.Variable(name="im_info")
-        gt_boxes = mx.sym.Variable(name="gt_boxes")
-        rpn_label = mx.sym.Variable(name='label')
-        rpn_bbox_target = mx.sym.Variable(name='bbox_target')
-        rpn_bbox_weight = mx.sym.Variable(name='bbox_weight')
-
-        # pass through ResNet
-        concat_data = mx.symbol.Concat(*[data, data_bef, data_aft], dim=0)
-        conv_feat = self.get_resnet_v1(concat_data)
-
-        # pass through FlowNet
-        concat_flow_data_1 = mx.symbol.Concat(data / 255.0, data_bef / 255.0, dim=1)
-        concat_flow_data_2 = mx.symbol.Concat(data / 255.0, data_aft / 255.0, dim=1)
-        concat_flow_data = mx.symbol.Concat(concat_flow_data_1, concat_flow_data_2, dim=0)
-        flow = self.get_flownet(concat_flow_data)
-
-        flow = mx.sym.SliceChannel(flow, axis=0, num_outputs=2)
-        conv_feat = mx.sym.SliceChannel(conv_feat, axis=0, num_outputs=3)
-
-        # warping
-        flow_grid_1 = mx.sym.GridGenerator(data=flow[0], transform_type='warp', name='flow_grid_1')
-        flow_grid_2 = mx.sym.GridGenerator(data=flow[1], transform_type='warp', name='flow_grid_2')
-        warp_conv_feat_1 = mx.sym.BilinearSampler(data=conv_feat[1], grid=flow_grid_1, name='warping_feat_1')
-        warp_conv_feat_2 = mx.sym.BilinearSampler(data=conv_feat[2], grid=flow_grid_2, name='warping_feat_2')
-
-        # pass through EmbedNet
-        concat_embed_data = mx.symbol.Concat(*[conv_feat[0], warp_conv_feat_1, warp_conv_feat_2], dim=0)
-        embed_output = self.get_embednet(concat_embed_data)
-        embed_output = mx.sym.SliceChannel(embed_output, axis=0, num_outputs=3)
-
-        unnormalize_weight1 = self.compute_weight(embed_output[1], embed_output[0])
-        unnormalize_weight2 = self.compute_weight(embed_output[2], embed_output[0])
-        unnormalize_weights = mx.symbol.Concat(unnormalize_weight1, unnormalize_weight2, dim=0)
-
-        weights = mx.symbol.softmax(data=unnormalize_weights, axis=0)
-        weights = mx.sym.SliceChannel(weights, axis=0, num_outputs=2)
-
-        # tile the channel dim of weights
-        weight1 = mx.symbol.tile(data=weights[0], reps=(1, 1024, 1, 1))
-        weight2 = mx.symbol.tile(data=weights[1], reps=(1, 1024, 1, 1))
-        select_conv_feat = weight1 * warp_conv_feat_1 + weight2 * warp_conv_feat_2
-
-        conv_feats = mx.sym.SliceChannel(select_conv_feat, axis=1, num_outputs=2)
-
-        # RPN layers
-        rpn_feat = conv_feats[0]
-        rpn_cls_score = mx.sym.Convolution(
-            data=rpn_feat, kernel=(1, 1), pad=(0, 0), num_filter=2 * num_anchors, name="rpn_cls_score")
-        rpn_bbox_pred = mx.sym.Convolution(
-            data=rpn_feat, kernel=(1, 1), pad=(0, 0), num_filter=4 * num_anchors, name="rpn_bbox_pred")
-
-        # prepare rpn data
-        rpn_cls_score_reshape = mx.sym.Reshape(
-            data=rpn_cls_score, shape=(0, 2, -1, 0), name="rpn_cls_score_reshape")
-
-        # classification
-        rpn_cls_prob = mx.sym.SoftmaxOutput(data=rpn_cls_score_reshape, label=rpn_label, multi_output=True,
-                                            normalization='valid', use_ignore=True, ignore_label=-1,
-                                            name="rpn_cls_prob")
-        # bounding box regression
-        if cfg.network.NORMALIZE_RPN:
-            rpn_bbox_loss_ = rpn_bbox_weight * mx.sym.smooth_l1(name='rpn_bbox_loss_', scalar=1.0,
-                                                                data=(rpn_bbox_pred - rpn_bbox_target))
-            rpn_bbox_pred = mx.sym.Custom(
-                bbox_pred=rpn_bbox_pred, op_type='rpn_inv_normalize', num_anchors=num_anchors,
-                bbox_mean=cfg.network.ANCHOR_MEANS, bbox_std=cfg.network.ANCHOR_STDS)
-        else:
-            rpn_bbox_loss_ = rpn_bbox_weight * mx.sym.smooth_l1(name='rpn_bbox_loss_', scalar=3.0,
-                                                                data=(rpn_bbox_pred - rpn_bbox_target))
-        rpn_bbox_loss = mx.sym.MakeLoss(name='rpn_bbox_loss', data=rpn_bbox_loss_,
-                                        grad_scale=1.0 / cfg.TRAIN.RPN_BATCH_SIZE)
-
-        # ROI proposal
-        rpn_cls_act = mx.sym.SoftmaxActivation(
-            data=rpn_cls_score_reshape, mode="channel", name="rpn_cls_act")
-        rpn_cls_act_reshape = mx.sym.Reshape(
-            data=rpn_cls_act, shape=(0, 2 * num_anchors, -1, 0), name='rpn_cls_act_reshape')
-
-        if cfg.TRAIN.CXX_PROPOSAL:
-            rois = mx.contrib.sym.Proposal(
-                cls_prob=rpn_cls_act_reshape, bbox_pred=rpn_bbox_pred, im_info=im_info, name='rois',
-                feature_stride=cfg.network.RPN_FEAT_STRIDE, scales=tuple(cfg.network.ANCHOR_SCALES),
-                ratios=tuple(cfg.network.ANCHOR_RATIOS),
-                rpn_pre_nms_top_n=cfg.TRAIN.RPN_PRE_NMS_TOP_N, rpn_post_nms_top_n=cfg.TRAIN.RPN_POST_NMS_TOP_N,
-                threshold=cfg.TRAIN.RPN_NMS_THRESH, rpn_min_size=cfg.TRAIN.RPN_MIN_SIZE)
-        else:
-            rois = mx.sym.Custom(
-                cls_prob=rpn_cls_act_reshape, bbox_pred=rpn_bbox_pred, im_info=im_info, name='rois',
-                op_type='proposal', feat_stride=cfg.network.RPN_FEAT_STRIDE,
-                scales=tuple(cfg.network.ANCHOR_SCALES), ratios=tuple(cfg.network.ANCHOR_RATIOS),
-                rpn_pre_nms_top_n=cfg.TRAIN.RPN_PRE_NMS_TOP_N, rpn_post_nms_top_n=cfg.TRAIN.RPN_POST_NMS_TOP_N,
-                threshold=cfg.TRAIN.RPN_NMS_THRESH, rpn_min_size=cfg.TRAIN.RPN_MIN_SIZE)
-
-            # ROI proposal target
-        gt_boxes_reshape = mx.sym.Reshape(data=gt_boxes, shape=(-1, 5), name='gt_boxes_reshape')
-        rois, label, bbox_target, bbox_weight = mx.sym.Custom(rois=rois, gt_boxes=gt_boxes_reshape,
-                                                              op_type='proposal_target',
-                                                              num_classes=num_reg_classes,
-                                                              batch_images=cfg.TRAIN.BATCH_IMAGES,
-                                                              batch_rois=cfg.TRAIN.BATCH_ROIS,
-                                                              cfg=cPickle.dumps(cfg),
-                                                              fg_fraction=cfg.TRAIN.FG_FRACTION)
-
-        # res5
-        rfcn_feat = conv_feats[1]
-        rfcn_cls = mx.sym.Convolution(data=rfcn_feat, kernel=(1, 1), num_filter=7 * 7 * num_classes, name="rfcn_cls")
-        rfcn_bbox = mx.sym.Convolution(data=rfcn_feat, kernel=(1, 1), num_filter=7 * 7 * 4 * num_reg_classes,
-                                       name="rfcn_bbox")
-        psroipooled_cls_rois = mx.contrib.sym.PSROIPooling(name='psroipooled_cls_rois', data=rfcn_cls, rois=rois,
-                                                           group_size=7,
-                                                           pooled_size=7,
-                                                           output_dim=num_classes, spatial_scale=0.0625)
-        psroipooled_loc_rois = mx.contrib.sym.PSROIPooling(name='psroipooled_loc_rois', data=rfcn_bbox, rois=rois,
-                                                           group_size=7,
-                                                           pooled_size=7,
-                                                           output_dim=8, spatial_scale=0.0625)
-        cls_score = mx.sym.Pooling(name='ave_cls_scors_rois', data=psroipooled_cls_rois, pool_type='avg',
-                                   global_pool=True,
-                                   kernel=(7, 7))
-        bbox_pred = mx.sym.Pooling(name='ave_bbox_pred_rois', data=psroipooled_loc_rois, pool_type='avg',
-                                   global_pool=True,
-                                   kernel=(7, 7))
-        cls_score = mx.sym.Reshape(name='cls_score_reshape', data=cls_score, shape=(-1, num_classes))
-        bbox_pred = mx.sym.Reshape(name='bbox_pred_reshape', data=bbox_pred, shape=(-1, 4 * num_reg_classes))
-
-        # classification
-        if cfg.TRAIN.ENABLE_OHEM:
-            print 'use ohem!'
-            labels_ohem, bbox_weights_ohem = mx.sym.Custom(op_type='BoxAnnotatorOHEM', num_classes=num_classes,
-                                                           num_reg_classes=num_reg_classes,
-                                                           roi_per_img=cfg.TRAIN.BATCH_ROIS_OHEM,
-                                                           cls_score=cls_score, bbox_pred=bbox_pred, labels=label,
-                                                           bbox_targets=bbox_target, bbox_weights=bbox_weight)
-            cls_prob = mx.sym.SoftmaxOutput(name='cls_prob', data=cls_score, label=labels_ohem, normalization='valid',
-                                            use_ignore=True, ignore_label=-1)
-            bbox_loss_ = bbox_weights_ohem * mx.sym.smooth_l1(name='bbox_loss_', scalar=1.0,
-                                                              data=(bbox_pred - bbox_target))
-            bbox_loss = mx.sym.MakeLoss(name='bbox_loss', data=bbox_loss_, grad_scale=1.0 / cfg.TRAIN.BATCH_ROIS_OHEM)
-            rcnn_label = labels_ohem
-        else:
-            cls_prob = mx.sym.SoftmaxOutput(name='cls_prob', data=cls_score, label=label, normalization='valid')
-            bbox_loss_ = bbox_weight * mx.sym.smooth_l1(name='bbox_loss_', scalar=1.0, data=(bbox_pred - bbox_target))
-            bbox_loss = mx.sym.MakeLoss(name='bbox_loss', data=bbox_loss_, grad_scale=1.0 / cfg.TRAIN.BATCH_ROIS)
-            rcnn_label = label
-
-        # reshape output
-        rcnn_label = mx.sym.Reshape(data=rcnn_label, shape=(cfg.TRAIN.BATCH_IMAGES, -1), name='label_reshape')
-        cls_prob = mx.sym.Reshape(data=cls_prob, shape=(cfg.TRAIN.BATCH_IMAGES, -1, num_classes),
-                                  name='cls_prob_reshape')
-        bbox_loss = mx.sym.Reshape(data=bbox_loss, shape=(cfg.TRAIN.BATCH_IMAGES, -1, 4 * num_reg_classes),
-                                   name='bbox_loss_reshape')
-
-        group = mx.sym.Group([rpn_cls_prob, rpn_bbox_loss, cls_prob, bbox_loss, mx.sym.BlockGrad(rcnn_label)])
-        self.sym = group
-        return group
-
-    def get_test_symbol(self, cfg):
-        # config alias for convenient
-        num_classes = cfg.dataset.NUM_CLASSES  # need to change to UCF 101
-
-        # data
-        data = mx.sym.Variable(name="data")  # 16 frames
-        heatmap = mx.sym.Variable(name='heatmap')  # 16 heatmaps
-        label = mx.sym.Variable(name='label')
-        data_bef = mx.sym.slice_axis(data, axis=0, begin=0, end=cfg.sample_duration - 2)  # 14 heatmaps 3 ch
-        data_curr = mx.sym.slice_axis(data, axis=0, begin=1, end=cfg.sample_duration - 1)  # 14 heatmaps 3 ch
-        data_aft = mx.sym.slice_axis(data, axis=0, begin=2, end=cfg.sample_duration)  # 14 heatmaps 3 ch
-        # slice channels
-        heat_bef = mx.sym.slice_axis(heatmap, axis=0, begin=0, end=cfg.sample_duration - 2)  # 14 heatmaps 1 channel
-        heat_curr = mx.sym.slice_axis(heatmap, axis=0, begin=1, end=cfg.sample_duration - 1)  # 14 heatmaps 1 channel
-        heat_aft = mx.sym.slice_axis(heatmap, axis=0, begin=2, end=cfg.sample_duration)  # 14 heatmaps 1 channel
-
-        # features
-        features = self.get_resnet_v1(data, is_cam=False)
-        feat_bef = mx.sym.slice_axis(features, axis=0, begin=0, end=cfg.sample_duration - 2)  # 14
-        feat_curr = mx.sym.slice_axis(features, axis=0, begin=1, end=cfg.sample_duration - 1)  # 14
-        feat_aft = mx.sym.slice_axis(features, axis=0, begin=2, end=cfg.sample_duration)  # 14
-
-        ### flow
-        concat_flow_data_1 = mx.symbol.Concat(data_curr / 255.0, data_bef / 255.0, dim=1)  # before
-        concat_flow_data_2 = mx.symbol.Concat(data_curr / 255.0, data_aft / 255.0, dim=1)  # after
-        concat_flow_data = mx.symbol.Concat(concat_flow_data_1, concat_flow_data_2, dim=0)
-        flow = self.get_flownet(concat_flow_data)
-        flow = mx.sym.SliceChannel(flow, axis=0, num_outputs=2)
-
-        flow_bef = mx.sym.SliceChannel(flow[0], axis=1, num_outputs=2)
-        flow_aft = mx.sym.SliceChannel(flow[1], axis=1, num_outputs=2)
-
-        concat_bef_1 = mx.symbol.Concat(heat_bef, flow_bef[0], dim=1)  # 14
-        concat_bef_2 = mx.symbol.Concat(heat_bef, flow_bef[1], dim=1)  # 14
-        concat_aft_1 = mx.symbol.Concat(heat_aft, flow_aft[0], dim=1)  #
-        concat_aft_2 = mx.symbol.Concat(heat_aft, flow_aft[1], dim=1)
-
-        fusion_concat = mx.symbol.Concat(concat_bef_1, concat_bef_2, concat_aft_1, concat_aft_2, dim=0)
-        fusion_res = self.fusion_layer(fusion_concat)
-        fusion_res_cat = mx.sym.SliceChannel(fusion_res, axis=0, num_outputs=4)
-        fusion_bef = mx.symbol.Concat(fusion_res_cat[0], fusion_res_cat[1], dim=1)  # 2 channels
-        fusion_aft = mx.symbol.Concat(fusion_res_cat[2], fusion_res_cat[3], dim=1)  # 2 channels
-
-        # warping
-        flow_heat_grid_bef = mx.sym.GridGenerator(data=fusion_bef, transform_type='warp', name='flow_heat_grid_bef')
-        flow_heat_grid_aft = mx.sym.GridGenerator(data=fusion_aft, transform_type='warp', name='flow_heat_grid_aft')
-        warp_conv_feat_bef = mx.sym.BilinearSampler(data=feat_bef, grid=flow_heat_grid_bef, name='warp_conv_feat_bef')
-        warp_conv_feat_aft = mx.sym.BilinearSampler(data=feat_aft, grid=flow_heat_grid_aft, name='warp_conv_feat_aft')
-
-        concat_features = mx.symbol.Concat(feat_curr, warp_conv_feat_bef, warp_conv_feat_aft, dim=1)
-
-        features_reduced = self.get_embednet(concat_features)
-
-        fc1 = mx.sym.FullyConnected(name='fc1', data=features_reduced, num_hidden=1024)
-        relu6 = mx.sym.Activation(data=fc1, act_type="relu")
-        dropout1 = mx.sym.Dropout(data=relu6, p=0.5)
-
-        re = mx.sym.reshape(dropout1, shape=(1, -1))
-        fc2 = mx.sym.FullyConnected(name='fc2', data=re, num_hidden=num_classes)
-
-        prediction = mx.sym.SoftmaxActivation(data=fc2, name='softmax')
-
-        group = mx.sym.Group([prediction])
-        self.sym = group
-
-        return group
+   
 
 
     def get_feat_symbol(self, cfg):
@@ -1550,33 +1296,50 @@ class resnet_v1_101_flownet_rfcn_ucf101(Symbol):
 
         arg_params['fc2_weight'] = mx.random.normal(0, 0.01, shape=self.arg_shape_dict['fc2_weight'])
         arg_params['fc2_bias'] = mx.nd.zeros(shape=self.arg_shape_dict['fc2_bias'])
+        
+        #inception 1 
         arg_params['branch0_weight'] = mx.random.normal(0, 0.01, shape=self.arg_shape_dict['branch0_weight'])
         arg_params['conv3d_branch1_weight'] = mx.random.normal(0, 0.01, shape=self.arg_shape_dict['conv3d_branch1_weight'])
         arg_params['branch1_weight'] = mx.random.normal(0, 0.01, shape=self.arg_shape_dict['branch1_weight'])
         arg_params['conv3d_branch2_weight'] = mx.random.normal(0, 0.01, shape=self.arg_shape_dict['conv3d_branch2_weight'])
         arg_params['branch2_weight'] = mx.random.normal(0, 0.01, shape=self.arg_shape_dict['branch2_weight'])
         arg_params['branch3_weight'] = mx.random.normal(0, 0.01, shape=self.arg_shape_dict['branch3_weight'])
-         
         arg_params['branch0_bias'] = mx.nd.zeros(shape=self.arg_shape_dict['branch0_bias'])
         arg_params['conv3d_branch1_bias'] = mx.nd.zeros(shape=self.arg_shape_dict['conv3d_branch1_bias'])
         arg_params['branch1_bias'] = mx.nd.zeros(shape=self.arg_shape_dict['branch1_bias'])
         arg_params['conv3d_branch2_bias'] = mx.nd.zeros(shape=self.arg_shape_dict['conv3d_branch2_bias'])
         arg_params['branch2_bias'] = mx.nd.zeros(shape=self.arg_shape_dict['branch2_bias'])
         arg_params['branch3_bias'] = mx.nd.zeros(shape=self.arg_shape_dict['branch3_bias'])
+        
+        #inception 2 
         arg_params['branch02_weight'] = mx.random.normal(0, 0.01, shape=self.arg_shape_dict['branch02_weight'])
         arg_params['conv3d_branch12_weight'] = mx.random.normal(0, 0.01, shape=self.arg_shape_dict['conv3d_branch12_weight'])
         arg_params['branch12_weight'] = mx.random.normal(0, 0.01, shape=self.arg_shape_dict['branch12_weight'])
         arg_params['conv3d_branch22_weight'] = mx.random.normal(0, 0.01, shape=self.arg_shape_dict['conv3d_branch22_weight'])
         arg_params['branch22_weight'] = mx.random.normal(0, 0.01, shape=self.arg_shape_dict['branch22_weight'])
         arg_params['branch32_weight'] = mx.random.normal(0, 0.01, shape=self.arg_shape_dict['branch32_weight'])
-
-
         arg_params['branch02_bias'] = mx.nd.zeros(shape=self.arg_shape_dict['branch02_bias'])
         arg_params['conv3d_branch12_bias'] = mx.nd.zeros(shape=self.arg_shape_dict['conv3d_branch12_bias'])
         arg_params['branch12_bias'] = mx.nd.zeros(shape=self.arg_shape_dict['branch12_bias'])
         arg_params['conv3d_branch22_bias'] = mx.nd.zeros(shape=self.arg_shape_dict['conv3d_branch22_bias'])
         arg_params['branch22_bias'] = mx.nd.zeros(shape=self.arg_shape_dict['branch22_bias'])
         arg_params['branch32_bias'] = mx.nd.zeros(shape=self.arg_shape_dict['branch32_bias'])
+
+        #inception 3 
+        arg_params['branch03_weight'] = mx.random.normal(0, 0.01, shape=self.arg_shape_dict['branch03_weight'])
+        arg_params['conv3d_branch13_weight'] = mx.random.normal(0, 0.01, shape=self.arg_shape_dict['conv3d_branch13_weight'])
+        arg_params['branch13_weight'] = mx.random.normal(0, 0.01, shape=self.arg_shape_dict['branch13_weight'])
+        arg_params['conv3d_branch23_weight'] = mx.random.normal(0, 0.01, shape=self.arg_shape_dict['conv3d_branch23_weight'])
+        arg_params['branch23_weight'] = mx.random.normal(0, 0.01, shape=self.arg_shape_dict['branch23_weight'])
+        arg_params['branch33_weight'] = mx.random.normal(0, 0.01, shape=self.arg_shape_dict['branch33_weight'])
+        arg_params['branch03_bias'] = mx.nd.zeros(shape=self.arg_shape_dict['branch03_bias'])
+        arg_params['conv3d_branch13_bias'] = mx.nd.zeros(shape=self.arg_shape_dict['conv3d_branch13_bias'])
+        arg_params['branch13_bias'] = mx.nd.zeros(shape=self.arg_shape_dict['branch13_bias'])
+        arg_params['conv3d_branch23_bias'] = mx.nd.zeros(shape=self.arg_shape_dict['conv3d_branch23_bias'])
+        arg_params['branch23_bias'] = mx.nd.zeros(shape=self.arg_shape_dict['branch23_bias'])
+        arg_params['branch33_bias'] = mx.nd.zeros(shape=self.arg_shape_dict['branch33_bias'])
+
+
         
         arg_params['cam_conv_3x3_weight'] = mx.random.normal(0, 0.01, shape=self.arg_shape_dict['cam_conv_3x3_weight'])
         arg_params['cam_conv_3x3_bias'] = mx.nd.zeros(shape=self.arg_shape_dict['cam_conv_3x3_bias'])
