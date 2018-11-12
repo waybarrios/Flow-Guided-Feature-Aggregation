@@ -1121,7 +1121,7 @@ class resnet_v1_101_flownet_rfcn_ucf101(Symbol):
 
         #inception
         inception0 = self.inception_3d_0(re)
-        inception1 = self.inception_3d_1(inception1)
+        inception1 = self.inception_3d_1(inception0)
         inception2 = self.inception_3d_2(inception1)
         inception3 = self.inception_3d_3(inception2)
         inception4 = self.inception_3d_4(inception3)
