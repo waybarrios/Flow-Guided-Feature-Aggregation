@@ -884,6 +884,24 @@ class resnet_v1_101_flownet_rfcn_ucf101(Symbol):
         return mx.symbol.Convolution(name='conv_fusion_1x1', data=concat_feature, num_filter=1, pad=(0, 0),
                                      kernel=(1, 1), stride=(1, 1), no_bias=False)
 
+    def inception_3d_0(self,net):
+        branch0 = mx.symbol.Convolution(name='branch00', data=net, num_filter=112, pad=(0, 0, 0), kernel=(1, 1, 1),
+                                                   stride=(1, 1, 1), no_bias=False)
+        conv3d_branch1 = mx.symbol.Convolution(name='conv3d_branch10', data=net, num_filter=144, pad=(0, 0, 0), kernel=(1, 1, 1),
+                                                   stride=(1, 1, 1), no_bias=False)
+        branch1 = mx.symbol.Convolution(name='branch10', data=conv3d_branch1, num_filter=288, pad=(1, 1, 1), kernel=(3, 3, 3),
+                                                   stride=(1, 1, 1), no_bias=False)
+        conv3d_branch2 = mx.symbol.Convolution(name='conv3d_branch20', data=net, num_filter=32, pad=(0, 0, 0), kernel=(1, 1, 1),
+                                                   stride=(1, 1, 1), no_bias=False)
+        branch2 = mx.symbol.Convolution(name='branch20', data=conv3d_branch2, num_filter=64, pad=(1, 1, 1), kernel=(3, 3, 3),
+                                                   stride=(1, 1, 1), no_bias=False)
+
+        pool_branch3 = mx.symbol.Pooling(name='pool_branch30', data=net, pad=(1,1,1), kernel=(3,3,3), stride=(1,1,1), pool_type='max')
+        branch3 = mx.symbol.Convolution(name='branch30', data=pool_branch3, num_filter=64, pad=(0, 0, 0), kernel=(1, 1, 1),
+                                                   stride=(1, 1, 1), no_bias=False)
+
+        return mx.symbol.Concat(branch0,branch1,branch2,branch3,dim=1)
+
     def inception_3d_1(self,net):
         branch0 = mx.symbol.Convolution(name='branch0', data=net, num_filter=112, pad=(0, 0, 0), kernel=(1, 1, 1),
                                                    stride=(1, 1, 1), no_bias=False)
@@ -1102,10 +1120,12 @@ class resnet_v1_101_flownet_rfcn_ucf101(Symbol):
         re = mx.symbol.reshape(concat_feat,shape=(1,1024,cfg.sample_duration,15,20))
 
         #inception
-        inception1 = self.inception_3d_1(re)
+        inception0 = self.inception_3d_0(re)
+        inception1 = self.inception_3d_1(inception1)
         inception2 = self.inception_3d_2(inception1)
         inception3 = self.inception_3d_3(inception2)
         inception4 = self.inception_3d_4(inception3)
+
         #classification
         global_pool= mx.sym.Pooling(name='global_pooling', data=inception4,kernel=(2,15,20), stride=(2,1,1) ,pool_type='avg')
         flatten = mx.sym.flatten(global_pool)
@@ -1317,6 +1337,21 @@ class resnet_v1_101_flownet_rfcn_ucf101(Symbol):
 
         arg_params['fc2_weight'] = mx.random.normal(0, 0.01, shape=self.arg_shape_dict['fc2_weight'])
         arg_params['fc2_bias'] = mx.nd.zeros(shape=self.arg_shape_dict['fc2_bias'])
+
+
+        #inception 0 
+        arg_params['branch00_weight'] = mx.random.normal(0, 0.01, shape=self.arg_shape_dict['branch00_weight'])
+        arg_params['conv3d_branch10_weight'] = mx.random.normal(0, 0.01, shape=self.arg_shape_dict['conv3d_branch10_weight'])
+        arg_params['branch10_weight'] = mx.random.normal(0, 0.01, shape=self.arg_shape_dict['branch10_weight'])
+        arg_params['conv3d_branch20_weight'] = mx.random.normal(0, 0.01, shape=self.arg_shape_dict['conv3d_branch20_weight'])
+        arg_params['branch20_weight'] = mx.random.normal(0, 0.01, shape=self.arg_shape_dict['branch20_weight'])
+        arg_params['branch30_weight'] = mx.random.normal(0, 0.01, shape=self.arg_shape_dict['branch30_weight'])
+        arg_params['branch00_bias'] = mx.nd.zeros(shape=self.arg_shape_dict['branch00_bias'])
+        arg_params['conv3d_branch10_bias'] = mx.nd.zeros(shape=self.arg_shape_dict['conv3d_branch10_bias'])
+        arg_params['branch10_bias'] = mx.nd.zeros(shape=self.arg_shape_dict['branch10_bias'])
+        arg_params['conv3d_branch20_bias'] = mx.nd.zeros(shape=self.arg_shape_dict['conv3d_branch20_bias'])
+        arg_params['branch20_bias'] = mx.nd.zeros(shape=self.arg_shape_dict['branch20_bias'])
+        arg_params['branch30_bias'] = mx.nd.zeros(shape=self.arg_shape_dict['branch30_bias'])
         
         #inception 1 
         arg_params['branch0_weight'] = mx.random.normal(0, 0.01, shape=self.arg_shape_dict['branch0_weight'])
