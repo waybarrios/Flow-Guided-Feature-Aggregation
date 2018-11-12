@@ -1067,10 +1067,10 @@ class resnet_v1_101_flownet_rfcn_ucf101(Symbol):
 
         #inception
         inception1 = self.inception_3d_1(re)
-        #inception2 = self.inception_3d_2(inception1)
+        inception2 = self.inception_3d_2(inception1)
 
         #classification
-        global_pool= mx.sym.Pooling(name='global_pooling', data=inception1,kernel=(2,15,20), stride=(2,1,1) ,pool_type='avg')
+        global_pool= mx.sym.Pooling(name='global_pooling', data=inception2,kernel=(2,15,20), stride=(2,1,1) ,pool_type='avg')
         flatten = mx.sym.flatten(global_pool)
         fc1 = mx.sym.FullyConnected(name='fc1', data=flatten, num_hidden=4096)
         relu6 = mx.sym.Activation(data=fc1, act_type="relu")
@@ -1563,7 +1563,6 @@ class resnet_v1_101_flownet_rfcn_ucf101(Symbol):
         arg_params['conv3d_branch2_bias'] = mx.nd.zeros(shape=self.arg_shape_dict['conv3d_branch2_bias'])
         arg_params['branch2_bias'] = mx.nd.zeros(shape=self.arg_shape_dict['branch2_bias'])
         arg_params['branch3_bias'] = mx.nd.zeros(shape=self.arg_shape_dict['branch3_bias'])
-        """
         arg_params['branch02_weight'] = mx.random.normal(0, 0.01, shape=self.arg_shape_dict['branch02_weight'])
         arg_params['conv3d_branch12_weight'] = mx.random.normal(0, 0.01, shape=self.arg_shape_dict['conv3d_branch12_weight'])
         arg_params['branch12_weight'] = mx.random.normal(0, 0.01, shape=self.arg_shape_dict['branch12_weight'])
@@ -1578,7 +1577,7 @@ class resnet_v1_101_flownet_rfcn_ucf101(Symbol):
         arg_params['conv3d_branch22_bias'] = mx.nd.zeros(shape=self.arg_shape_dict['conv3d_branch22_bias'])
         arg_params['branch22_bias'] = mx.nd.zeros(shape=self.arg_shape_dict['branch22_bias'])
         arg_params['branch32_bias'] = mx.nd.zeros(shape=self.arg_shape_dict['branch32_bias'])
-        """
+        
         arg_params['cam_conv_3x3_weight'] = mx.random.normal(0, 0.01, shape=self.arg_shape_dict['cam_conv_3x3_weight'])
         arg_params['cam_conv_3x3_bias'] = mx.nd.zeros(shape=self.arg_shape_dict['cam_conv_3x3_bias'])
         arg_params['cam_fc_weights'] = mx.random.normal(0, 0.01, shape=self.arg_shape_dict['cam_fc_weights'])
