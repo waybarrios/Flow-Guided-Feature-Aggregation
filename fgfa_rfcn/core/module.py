@@ -946,10 +946,10 @@ class MutableModule(BaseModule):
             for nbatch, data_batch in enumerate(train_data):
                 if monitor is not None:
                     monitor.tic()
-                tmp_label = [int(data_batch.label[i][0].asnumpy())  for i in range(len(data_batch.label))]
+                #tmp_label = [int(data_batch.label[i][0].asnumpy())  for i in range(len(data_batch.label))]
                 print("Batch:{0}   Epoch:{1}  ".format(nbatch,epoch))
                 self.forward_backward(data_batch)
-                print("label gt = {0}, label predict = {1}".format(tmp_label, self.predict_label))
+                #print("label gt = {0}, label predict = {1}".format(tmp_label, self.predict_label))
                 self.update()
                 self.update_metric(eval_metric, data_batch.label)
                 

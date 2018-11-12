@@ -368,7 +368,7 @@ class TrainLoader(mx.io.DataIter):
         all_data = [_['data'] for _ in rst]
         all_label = [_['label'] for _ in rst]
         self.data = [[mx.nd.array(data[key]) for key in self.data_name] for data in all_data]
-        self.label = [[mx.nd.array([label[key]]) for key in self.label_name] for label in all_label]
+        self.label = [[mx.nd.array(label[key]) for key in self.label_name] for label in all_label]
 
     def parfetch(self, iroidb):
         # get testing data for multigpu
@@ -376,9 +376,8 @@ class TrainLoader(mx.io.DataIter):
         imgs, hms, labels, roidb = self.get_video_label(iroidb, self.cfg)
 
         #im_info = np.array([roidb[0]['im_info']], dtype=np.float32)
-
         data = {'data': imgs} #, 'heatmap': hms}
-        label = {'label1': labels,'label2':labels}
+        label = {'label1': [labels for i in range(4)],'label2':[labels]}
 
         return {'data': data, 'label': label}
 
