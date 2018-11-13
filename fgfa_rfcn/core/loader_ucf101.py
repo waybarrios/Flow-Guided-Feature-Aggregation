@@ -377,7 +377,7 @@ class TrainLoader(mx.io.DataIter):
 
         #im_info = np.array([roidb[0]['im_info']], dtype=np.float32)
         data = {'data': imgs} #, 'heatmap': hms}
-        label = {'label1': [labels for i in range(4)],'label2':[labels]}
+        label = {'label1': [labels for i in range(8)],'label2':[labels]}
 
         return {'data': data, 'label': label}
 
