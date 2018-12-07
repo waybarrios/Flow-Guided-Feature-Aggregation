@@ -8,6 +8,7 @@
 import numpy as np
 from dataset import *
 from dataset.ucf101 import UCF101
+from dataset.kinetics import kinetics
 
 
 def load_gt_imdb(dataset_name, root_path, dataset_path, traintestlist_path, result_path=None, split='01', subset='train',
