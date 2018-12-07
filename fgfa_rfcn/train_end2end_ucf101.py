@@ -154,11 +154,11 @@ def train_net(args, ctx, pretrained, pretrained_flow, epoch, prefix, begin_epoch
     #if not isinstance(train_data, PrefetchingIter):
      #   train_data = PrefetchingIter(train_data)
     # train
-    lr_sch = mx.lr_scheduler.FactorScheduler(step=500, factor=0.1)
+    lr_sch = mx.lr_scheduler.FactorScheduler(step=10000, factor=0.1)
     adam = mx.optimizer.create('adam', learning_rate=base_lr)
     mod.fit(train_data, eval_metric=eval_metrics, epoch_end_callback=epoch_end_callback,
             batch_end_callback=batch_end_callback, kvstore=config.default.kvstore,
-            optimizer=adam, optimizer_params=(('learning_rate', base_lr),), 
+            optimizer='sgd', optimizer_params=(('learning_rate', base_lr),('lr_scheduler',lr_sch),('momentum', config.TRAIN.momentum)), 
             arg_params=arg_params, aux_params=aux_params, begin_epoch=begin_epoch, num_epoch=end_epoch)
 
 
